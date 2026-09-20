@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+
 import {
   useCallback,
   useEffect,
@@ -10,10 +11,13 @@ import {
 } from "react";
 
 import { regions, services } from "../data";
+
 import type { Company } from "../data";
 
+import Footer from "../Footer";
+
 /* =====================================
-   이지종합건설 기본 설정
+   이지종합건설 설정
 ===================================== */
 
 const EASY_HOMECARE_URL =
@@ -49,10 +53,6 @@ type CompanyRow = {
   images: string[] | null;
 };
 
-/* =====================================
-   Supabase 데이터를 업체 정보로 변환
-===================================== */
-
 function toCompany(row: CompanyRow): Company {
   return {
     id: row.id,
@@ -72,7 +72,7 @@ function toCompany(row: CompanyRow): Company {
 }
 
 /* =====================================
-   이지종합건설 업체 확인
+   이지종합건설 확인
 ===================================== */
 
 function isEasyHomecare(
@@ -132,7 +132,7 @@ export default function CompaniesPage() {
   const [error, setError] = useState("");
 
   /* =====================================
-     승인된 업체 불러오기
+     승인 업체 불러오기
   ===================================== */
 
   const loadCompanies = useCallback(async () => {
@@ -143,7 +143,6 @@ export default function CompaniesPage() {
       setError(
         "업체 검색 설정을 확인할 수 없습니다."
       );
-
       setLoading(false);
       return;
     }
@@ -195,7 +194,7 @@ export default function CompaniesPage() {
   }, [loadCompanies]);
 
   /* =====================================
-     업체 검색 기능
+     업체 검색
   ===================================== */
 
   const results = useMemo(() => {
@@ -500,24 +499,9 @@ export default function CompaniesPage() {
         )}
       </section>
 
-      {/* 하단 정보 */}
+      {/* 공통 하단 사업자 정보 */}
 
-      <footer className="footer">
-        <div className="container">
-          <strong>
-            집수리모아
-          </strong>
-
-          <p>
-            전국 집수리 업체 검색 및 연결 플랫폼
-          </p>
-
-          <small>
-            © 2026 집수리모아.
-            All rights reserved.
-          </small>
-        </div>
-      </footer>
+      <Footer />
     </main>
   );
 }
