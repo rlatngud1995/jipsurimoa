@@ -1,9 +1,17 @@
+
 "use client";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { regions, services } from "./data";
 import type { Company } from "./data";
+
+/* =====================================
+   기본 설정
+===================================== */
+
+const EASY_HOMECARE_URL =
+  "https://easyhomecare.vercel.app/";
 
 /* =====================================
    Supabase 연결
@@ -44,6 +52,24 @@ function toCompany(row: CompanyRow): Company {
       ? row.images
       : [],
   };
+}
+
+/* =====================================
+   업체별 홈페이지 연결
+===================================== */
+
+function getCompanyWebsite(
+  company: Company
+): string | null {
+  const normalizedName = company.name
+    .replace(/\s+/g, "")
+    .trim();
+
+  if (normalizedName === "이지종합건설") {
+    return EASY_HOMECARE_URL;
+  }
+
+  return null;
 }
 
 /* =====================================
@@ -442,70 +468,86 @@ export default function Home() {
         {!error && !loading && (
           <>
             <div className="companyGrid">
-              {filtered.map((company) => (
-                <article
-                  className="companyCard"
-                  key={company.id}
-                >
-                  <div className="companyImage">
-                    {company.images.length > 0 ? (
-                      <img
-                        src={company.images[0]}
-                        alt={`${company.name} 시공사례`}
-                        loading="lazy"
-                      />
-                    ) : (
-                      <span aria-hidden="true">
-                        🏠
-                      </span>
-                    )}
-                  </div>
+              {filtered.map((company) => {
+                const website =
+                  getCompanyWebsite(company);
 
-                  <div className="companyContent">
-                    <span className="companyBadge">
-                      등록 업체
-                    </span>
-
-                    <h3>
-                      {company.name}
-                    </h3>
-
-                    <p>
-                      {company.description}
-                    </p>
-
-                    <div className="companyInfo">
-                      <span>
-                        📍{" "}
-                        {company.regions.join(", ")}
-                      </span>
-
-                      <span>
-                        🛠️{" "}
-                        {company.services.join(", ")}
-                      </span>
-                    </div>
-
-                    <div className="companyActions">
-                      <Link
-                        href={`/companies/${company.id}`}
-                        className="outlineButton"
-                      >
-                        상세보기
-                      </Link>
-
-                      {company.phone && (
-                        <a
-                          href={`tel:${company.phone}`}
-                          className="primaryButton"
-                        >
-                          📞 전화 문의
-                        </a>
+                return (
+                  <article
+                    className="companyCard"
+                    key={company.id}
+                  >
+                    <div className="companyImage">
+                      {company.images.length > 0 ? (
+                        <img
+                          src={company.images[0]}
+                          alt={`${company.name} 시공사례`}
+                          loading="lazy"
+                        />
+                      ) : (
+                        <span aria-hidden="true">
+                          🏠
+                        </span>
                       )}
                     </div>
-                  </div>
-                </article>
-              ))}
+
+                    <div className="companyContent">
+                      <span className="companyBadge">
+                        등록 업체
+                      </span>
+
+                      <h3>
+                        {company.name}
+                      </h3>
+
+                      <p>
+                        {company.description}
+                      </p>
+
+                      <div className="companyInfo">
+                        <span>
+                          📍{" "}
+                          {company.regions.join(", ")}
+                        </span>
+
+                        <span>
+                          🛠️{" "}
+                          {company.services.join(", ")}
+                        </span>
+                      </div>
+
+                      <div className="companyActions">
+                        {website ? (
+                          <a
+                            href={website}
+                            className="outlineButton"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            상세보기
+                          </a>
+                        ) : (
+                          <Link
+                            href={`/companies/${company.id}`}
+                            className="outlineButton"
+                          >
+                            상세보기
+                          </Link>
+                        )}
+
+                        {company.phone && (
+                          <a
+                            href={`tel:${company.phone}`}
+                            className="primaryButton"
+                          >
+                            📞 전화 문의
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
 
             {filtered.length === 0 && (
