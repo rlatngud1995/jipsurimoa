@@ -1,13 +1,16 @@
+
 "use client";
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import type { FormEvent } from "react";
 
 type Application = {
   id: string;
   name: string | null;
   owner: string | null;
   phone: string | null;
+  website_url: string | null;
   description: string | null;
   regions: string[] | null;
   services: string[] | null;
@@ -34,7 +37,9 @@ function getHeaders(accessToken: string) {
   };
 }
 
-async function readError(response: Response): Promise<string> {
+async function readError(
+  response: Response
+): Promise<string> {
   try {
     const data = await response.json();
 
@@ -42,7 +47,9 @@ async function readError(response: Response): Promise<string> {
       return data.message;
     }
 
-    if (typeof data?.error_description === "string") {
+    if (
+      typeof data?.error_description === "string"
+    ) {
       return data.error_description;
     }
 
@@ -50,7 +57,7 @@ async function readError(response: Response): Promise<string> {
       return data.error;
     }
   } catch {
-    // 오류 응답이 JSON 형식이 아닌 경우
+    // 오류 응답이 JSON이 아닌 경우
   }
 
   return `서버 오류 (${response.status})`;
@@ -74,22 +81,67 @@ function statusLabel(status: string | null) {
   return "승인 대기";
 }
 
+/* =====================================
+   홈페이지 주소 확인
+===================================== */
+
+function getSafeWebsiteUrl(
+  value: string | null
+): string | null {
+  if (!value?.trim()) return null;
+
+  try {
+    const url = new URL(value.trim());
+
+    if (
+      !["https:", "http:"].includes(
+        url.protocol
+      ) ||
+      !url.hostname.includes(".") ||
+      url.username ||
+      url.password
+    ) {
+      return null;
+    }
+
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+/* =====================================
+   관리자 페이지
+===================================== */
+
 export default function AdminPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const [accessToken, setAccessToken] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [accessToken, setAccessToken] =
+    useState("");
 
-  const [applications, setApplications] = useState<Application[]>(
-    []
-  );
+  const [isAdmin, setIsAdmin] =
+    useState(false);
 
-  const [loading, setLoading] = useState(false);
-  const [processingId, setProcessingId] = useState("");
+  const [applications, setApplications] =
+    useState<Application[]>([]);
 
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [loading, setLoading] =
+    useState(false);
+
+  const [processingId, setProcessingId] =
+    useState("");
+
+  const [message, setMessage] =
+    useState("");
+
+  const [error, setError] =
+    useState("");
+
+  /* =====================================
+     신청 목록 불러오기
+  ===================================== */
 
   const loadApplications = useCallback(
     async (token: string) => {
@@ -114,7 +166,8 @@ export default function AdminPage() {
           );
         }
 
-        const data: unknown = await response.json();
+        const data: unknown =
+          await response.json();
 
         if (!Array.isArray(data)) {
           throw new Error(
@@ -122,7 +175,9 @@ export default function AdminPage() {
           );
         }
 
-        setApplications(data as Application[]);
+        setApplications(
+          data as Application[]
+        );
       } catch (err) {
         setError(
           err instanceof Error
@@ -144,8 +199,12 @@ export default function AdminPage() {
     }
   }, []);
 
+  /* =====================================
+     관리자 로그인
+  ===================================== */
+
   async function handleLogin(
-    event: React.FormEvent<HTMLFormElement>
+    event: FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
 
@@ -183,7 +242,8 @@ export default function AdminPage() {
         );
       }
 
-      const loginData = await loginResponse.json();
+      const loginData =
+        await loginResponse.json();
 
       const token = loginData.access_token as
         | string
@@ -212,7 +272,8 @@ export default function AdminPage() {
         );
       }
 
-      const adminResult = await adminResponse.json();
+      const adminResult =
+        await adminResponse.json();
 
       if (adminResult !== true) {
         throw new Error(
@@ -224,7 +285,9 @@ export default function AdminPage() {
       setIsAdmin(true);
       setPassword("");
 
-      setMessage("관리자 로그인이 완료되었습니다.");
+      setMessage(
+        "관리자 로그인이 완료되었습니다."
+      );
 
       await loadApplications(token);
     } catch (err) {
@@ -241,6 +304,10 @@ export default function AdminPage() {
     }
   }
 
+  /* =====================================
+     로그아웃
+  ===================================== */
+
   function handleLogout() {
     setAccessToken("");
     setIsAdmin(false);
@@ -250,6 +317,10 @@ export default function AdminPage() {
     setError("");
     setMessage("로그아웃되었습니다.");
   }
+
+  /* =====================================
+     업체 승인 및 반려
+  ===================================== */
 
   async function changeStatus(
     application: Application,
@@ -285,7 +356,9 @@ export default function AdminPage() {
     }
 
     const action =
-      nextStatus === "approved" ? "승인" : "반려";
+      nextStatus === "approved"
+        ? "승인"
+        : "반려";
 
     const confirmed = window.confirm(
       `${application.name || "해당 업체"}의 등록 신청을 ${action}하시겠습니까?`
@@ -299,11 +372,9 @@ export default function AdminPage() {
 
     try {
       /*
-       * approved_companies는 VIEW이므로
-       * INSERT 또는 UPDATE하지 않습니다.
-       *
-       * 원본 company_applications의
-       * status만 변경합니다.
+       * approved_companies는 VIEW입니다.
+       * 신청서의 status만 변경하면
+       * 승인 업체 목록에 반영됩니다.
        */
       const response = await fetch(
         `${SUPABASE_URL}/rest/v1/company_applications?id=eq.${encodeURIComponent(
@@ -331,7 +402,8 @@ export default function AdminPage() {
         );
       }
 
-      const updated: unknown = await response.json();
+      const updated: unknown =
+        await response.json();
 
       if (
         !Array.isArray(updated) ||
@@ -370,6 +442,10 @@ export default function AdminPage() {
     }
   }
 
+  /* =====================================
+     화면
+  ===================================== */
+
   return (
     <main
       style={{
@@ -381,11 +457,13 @@ export default function AdminPage() {
       <header
         style={{
           background: "#ffffff",
-          borderBottom: "1px solid #e5eaf2",
+          borderBottom:
+            "1px solid #e5eaf2",
           padding: "18px 20px",
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
+          justifyContent:
+            "space-between",
           gap: "12px",
         }}
       >
@@ -420,7 +498,11 @@ export default function AdminPage() {
           padding: "32px 16px 70px",
         }}
       >
-        <div style={{ marginBottom: "28px" }}>
+        <div
+          style={{
+            marginBottom: "28px",
+          }}
+        >
           <span
             style={{
               display: "inline-block",
@@ -453,7 +535,8 @@ export default function AdminPage() {
               margin: 0,
             }}
           >
-            업체 등록 신청을 확인하고 승인 또는 반려할 수 있습니다.
+            업체 등록 신청을 확인하고
+            승인 또는 반려할 수 있습니다.
           </p>
         </div>
 
@@ -463,7 +546,8 @@ export default function AdminPage() {
             style={{
               padding: "16px",
               background: "#fef2f2",
-              border: "1px solid #fecaca",
+              border:
+                "1px solid #fecaca",
               color: "#991b1b",
               borderRadius: "12px",
               marginBottom: "20px",
@@ -481,7 +565,8 @@ export default function AdminPage() {
             style={{
               padding: "16px",
               background: "#eff6ff",
-              border: "1px solid #bfdbfe",
+              border:
+                "1px solid #bfdbfe",
               color: "#1d4ed8",
               borderRadius: "12px",
               marginBottom: "20px",
@@ -493,11 +578,14 @@ export default function AdminPage() {
         )}
 
         {!isAdmin ? (
+          /* 관리자 로그인 */
+
           <form
             onSubmit={handleLogin}
             style={{
               background: "#ffffff",
-              border: "1px solid #e5eaf2",
+              border:
+                "1px solid #e5eaf2",
               borderRadius: "18px",
               padding: "24px",
               boxShadow:
@@ -520,7 +608,8 @@ export default function AdminPage() {
                 lineHeight: 1.6,
               }}
             >
-              Supabase에 등록한 관리자 계정으로 로그인해 주세요.
+              Supabase에 등록한 관리자 계정으로
+              로그인해 주세요.
             </p>
 
             <label
@@ -549,7 +638,8 @@ export default function AdminPage() {
                 width: "100%",
                 boxSizing: "border-box",
                 padding: "14px",
-                border: "1px solid #cbd5e1",
+                border:
+                  "1px solid #cbd5e1",
                 borderRadius: "10px",
                 fontSize: "16px",
               }}
@@ -581,7 +671,8 @@ export default function AdminPage() {
                 width: "100%",
                 boxSizing: "border-box",
                 padding: "14px",
-                border: "1px solid #cbd5e1",
+                border:
+                  "1px solid #cbd5e1",
                 borderRadius: "10px",
                 fontSize: "16px",
               }}
@@ -613,11 +704,14 @@ export default function AdminPage() {
             </button>
           </form>
         ) : (
+          /* 업체 신청 목록 */
+
           <>
             <div
               style={{
                 display: "flex",
-                justifyContent: "space-between",
+                justifyContent:
+                  "space-between",
                 alignItems: "center",
                 gap: "12px",
                 flexWrap: "wrap",
@@ -630,7 +724,8 @@ export default function AdminPage() {
                   fontSize: "21px",
                 }}
               >
-                등록 신청 목록 ({applications.length}건)
+                등록 신청 목록 (
+                {applications.length}건)
               </h2>
 
               <div
@@ -646,7 +741,8 @@ export default function AdminPage() {
                     loadApplications(accessToken)
                   }
                   disabled={
-                    loading || Boolean(processingId)
+                    loading ||
+                    Boolean(processingId)
                   }
                   style={{
                     padding: "10px 14px",
@@ -699,7 +795,8 @@ export default function AdminPage() {
                   color: "#64748b",
                 }}
               >
-                현재 접수된 업체 등록 신청이 없습니다.
+                현재 접수된 업체 등록 신청이
+                없습니다.
               </div>
             ) : (
               <div
@@ -711,7 +808,8 @@ export default function AdminPage() {
                 {applications.map(
                   (application) => {
                     const isProcessing =
-                      processingId === application.id;
+                      processingId ===
+                      application.id;
 
                     const isBusy =
                       Boolean(processingId);
@@ -724,6 +822,11 @@ export default function AdminPage() {
                       application.status ===
                       "rejected";
 
+                    const website =
+                      getSafeWebsiteUrl(
+                        application.website_url
+                      );
+
                     return (
                       <article
                         key={application.id}
@@ -733,7 +836,8 @@ export default function AdminPage() {
                             "1px solid #e5eaf2",
                           borderRadius: "16px",
                           padding: "22px",
-                          overflowWrap: "anywhere",
+                          overflowWrap:
+                            "anywhere",
                         }}
                       >
                         <div
@@ -760,19 +864,24 @@ export default function AdminPage() {
 
                           <span
                             style={{
-                              background: isApproved
-                                ? "#dcfce7"
-                                : isRejected
-                                ? "#fee2e2"
-                                : "#fef3c7",
-                              color: isApproved
-                                ? "#166534"
-                                : isRejected
-                                ? "#991b1b"
-                                : "#92400e",
-                              borderRadius: "20px",
-                              padding: "6px 12px",
-                              fontSize: "13px",
+                              background:
+                                isApproved
+                                  ? "#dcfce7"
+                                  : isRejected
+                                  ? "#fee2e2"
+                                  : "#fef3c7",
+                              color:
+                                isApproved
+                                  ? "#166534"
+                                  : isRejected
+                                  ? "#991b1b"
+                                  : "#92400e",
+                              borderRadius:
+                                "20px",
+                              padding:
+                                "6px 12px",
+                              fontSize:
+                                "13px",
                               fontWeight: 700,
                             }}
                           >
@@ -803,6 +912,33 @@ export default function AdminPage() {
                             </strong>
                             {application.phone ||
                               "-"}
+                          </div>
+
+                          {/* 홈페이지 주소 */}
+
+                          <div>
+                            <strong>
+                              홈페이지:{" "}
+                            </strong>
+
+                            {website ? (
+                              <a
+                                href={website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  color: "#2563eb",
+                                  textDecoration:
+                                    "underline",
+                                  overflowWrap:
+                                    "anywhere",
+                                }}
+                              >
+                                {website}
+                              </a>
+                            ) : (
+                              "등록하지 않음"
+                            )}
                           </div>
 
                           <div>
@@ -911,20 +1047,27 @@ export default function AdminPage() {
                               }
                               disabled={isBusy}
                               style={{
-                                flex: "1 1 130px",
+                                flex:
+                                  "1 1 130px",
                                 padding: "13px",
-                                border: "none",
+                                border:
+                                  "none",
                                 borderRadius:
                                   "10px",
-                                background: isBusy
-                                  ? "#86efac"
-                                  : "#16a34a",
-                                color: "#ffffff",
-                                fontWeight: 800,
-                                fontSize: "15px",
-                                cursor: isBusy
-                                  ? "wait"
-                                  : "pointer",
+                                background:
+                                  isBusy
+                                    ? "#86efac"
+                                    : "#16a34a",
+                                color:
+                                  "#ffffff",
+                                fontWeight:
+                                  800,
+                                fontSize:
+                                  "15px",
+                                cursor:
+                                  isBusy
+                                    ? "wait"
+                                    : "pointer",
                               }}
                             >
                               {isProcessing
@@ -947,7 +1090,8 @@ export default function AdminPage() {
                                 style={{
                                   flex:
                                     "1 1 130px",
-                                  padding: "13px",
+                                  padding:
+                                    "13px",
                                   border:
                                     "1px solid #fecaca",
                                   borderRadius:
@@ -956,11 +1100,14 @@ export default function AdminPage() {
                                     "#fff1f2",
                                   color:
                                     "#be123c",
-                                  fontWeight: 800,
-                                  fontSize: "15px",
-                                  cursor: isBusy
-                                    ? "wait"
-                                    : "pointer",
+                                  fontWeight:
+                                    800,
+                                  fontSize:
+                                    "15px",
+                                  cursor:
+                                    isBusy
+                                      ? "wait"
+                                      : "pointer",
                                 }}
                               >
                                 {isProcessing
@@ -972,9 +1119,12 @@ export default function AdminPage() {
                           {isApproved && (
                             <span
                               style={{
-                                color: "#166534",
-                                fontWeight: 700,
-                                fontSize: "14px",
+                                color:
+                                  "#166534",
+                                fontWeight:
+                                  700,
+                                fontSize:
+                                  "14px",
                                 padding:
                                   "12px 0",
                               }}
