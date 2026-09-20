@@ -13,11 +13,14 @@ import { regions, services } from "../data";
 import type { Company } from "../data";
 
 /* =====================================
-   기본 설정
+   이지종합건설 기본 설정
 ===================================== */
 
 const EASY_HOMECARE_URL =
   "https://easyhomecare.vercel.app/";
+
+const EASY_HOMECARE_IMAGE =
+  "/IMG_0778.png";
 
 /* =====================================
    Supabase 연결
@@ -46,6 +49,10 @@ type CompanyRow = {
   images: string[] | null;
 };
 
+/* =====================================
+   Supabase 데이터를 업체 정보로 변환
+===================================== */
+
 function toCompany(row: CompanyRow): Company {
   return {
     id: row.id,
@@ -65,18 +72,45 @@ function toCompany(row: CompanyRow): Company {
 }
 
 /* =====================================
+   이지종합건설 업체 확인
+===================================== */
+
+function isEasyHomecare(
+  company: Company
+): boolean {
+  return (
+    company.name.replace(/\s+/g, "").trim() ===
+    "이지종합건설"
+  );
+}
+
+/* =====================================
    업체별 홈페이지 연결
 ===================================== */
 
 function getCompanyWebsite(
   company: Company
 ): string | null {
-  const normalizedName = company.name
-    .replace(/\s+/g, "")
-    .trim();
-
-  if (normalizedName === "이지종합건설") {
+  if (isEasyHomecare(company)) {
     return EASY_HOMECARE_URL;
+  }
+
+  return null;
+}
+
+/* =====================================
+   업체별 대표 이미지
+===================================== */
+
+function getCompanyImage(
+  company: Company
+): string | null {
+  if (isEasyHomecare(company)) {
+    return EASY_HOMECARE_IMAGE;
+  }
+
+  if (company.images.length > 0) {
+    return company.images[0];
   }
 
   return null;
@@ -98,7 +132,7 @@ export default function CompaniesPage() {
   const [error, setError] = useState("");
 
   /* =====================================
-     승인 업체 불러오기
+     승인된 업체 불러오기
   ===================================== */
 
   const loadCompanies = useCallback(async () => {
@@ -109,6 +143,7 @@ export default function CompaniesPage() {
       setError(
         "업체 검색 설정을 확인할 수 없습니다."
       );
+
       setLoading(false);
       return;
     }
@@ -132,7 +167,8 @@ export default function CompaniesPage() {
         );
       }
 
-      const rows: unknown = await response.json();
+      const rows: unknown =
+        await response.json();
 
       if (!Array.isArray(rows)) {
         throw new Error(
@@ -337,19 +373,41 @@ export default function CompaniesPage() {
                 const website =
                   getCompanyWebsite(company);
 
+                const companyImage =
+                  getCompanyImage(company);
+
                 return (
                   <article
                     className="companyCard"
                     key={company.id}
                   >
-                    {/* 업체 사진 */}
+                    {/* 업체 대표사진 */}
 
-                    <div className="companyImage">
-                      {company.images.length > 0 ? (
+                    <div
+                      className="companyImage"
+                      style={
+                        isEasyHomecare(company)
+                          ? {
+                              background: "#ffffff",
+                            }
+                          : undefined
+                      }
+                    >
+                      {companyImage ? (
                         <img
-                          src={company.images[0]}
-                          alt={`${company.name} 시공사례`}
+                          src={companyImage}
+                          alt={`${company.name} 대표 이미지`}
                           loading="lazy"
+                          style={
+                            isEasyHomecare(company)
+                              ? {
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "contain",
+                                  background: "#ffffff",
+                                }
+                              : undefined
+                          }
                         />
                       ) : (
                         <span aria-hidden="true">
@@ -385,7 +443,7 @@ export default function CompaniesPage() {
                         </span>
                       </div>
 
-                      {/* 상세보기 버튼 */}
+                      {/* 상세보기 및 전화 문의 */}
 
                       <div className="companyActions">
                         {website ? (
@@ -405,8 +463,6 @@ export default function CompaniesPage() {
                             업체 상세보기
                           </Link>
                         )}
-
-                        {/* 전화 문의 */}
 
                         {company.phone && (
                           <a
