@@ -23,6 +23,15 @@ const SITE_DESCRIPTION =
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
 
+  /* 네이버 서치어드바이저 소유확인 */
+
+  verification: {
+    other: {
+      "naver-site-verification":
+        "2196f8953200f9512d5e75a419802445ec28014",
+    },
+  },
+
   title: {
     default: SITE_TITLE,
     template: `%s | ${SITE_NAME}`,
