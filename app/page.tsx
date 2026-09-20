@@ -2,7 +2,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import { regions, services } from "./data";
 import type { Company } from "./data";
 
@@ -12,6 +18,9 @@ import type { Company } from "./data";
 
 const EASY_HOMECARE_URL =
   "https://easyhomecare.vercel.app/";
+
+const EASY_HOMECARE_IMAGE =
+  "/IMG_0778.png";
 
 /* =====================================
    Supabase 연결
@@ -55,18 +64,45 @@ function toCompany(row: CompanyRow): Company {
 }
 
 /* =====================================
+   이지종합건설 업체 확인
+===================================== */
+
+function isEasyHomecare(
+  company: Company
+): boolean {
+  return (
+    company.name.replace(/\s+/g, "").trim() ===
+    "이지종합건설"
+  );
+}
+
+/* =====================================
    업체별 홈페이지 연결
 ===================================== */
 
 function getCompanyWebsite(
   company: Company
 ): string | null {
-  const normalizedName = company.name
-    .replace(/\s+/g, "")
-    .trim();
-
-  if (normalizedName === "이지종합건설") {
+  if (isEasyHomecare(company)) {
     return EASY_HOMECARE_URL;
+  }
+
+  return null;
+}
+
+/* =====================================
+   업체별 대표 이미지
+===================================== */
+
+function getCompanyImage(
+  company: Company
+): string | null {
+  if (isEasyHomecare(company)) {
+    return EASY_HOMECARE_IMAGE;
+  }
+
+  if (company.images.length > 0) {
+    return company.images[0];
   }
 
   return null;
@@ -119,7 +155,8 @@ const serviceImages: Record<string, string> = {
 ===================================== */
 
 export default function Home() {
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companies, setCompanies] =
+    useState<Company[]>([]);
 
   const [region, setRegion] = useState("");
   const [service, setService] = useState("");
@@ -199,10 +236,12 @@ export default function Home() {
 
     return companies.filter((company) => {
       const matchRegion =
-        !region || company.regions.includes(region);
+        !region ||
+        company.regions.includes(region);
 
       const matchService =
-        !service || company.services.includes(service);
+        !service ||
+        company.services.includes(service);
 
       const searchableText = [
         company.name,
@@ -215,7 +254,9 @@ export default function Home() {
 
       const matchKeyword =
         !normalizedKeyword ||
-        searchableText.includes(normalizedKeyword);
+        searchableText.includes(
+          normalizedKeyword
+        );
 
       return (
         matchRegion &&
@@ -472,17 +513,32 @@ export default function Home() {
                 const website =
                   getCompanyWebsite(company);
 
+                const companyImage =
+                  getCompanyImage(company);
+
                 return (
                   <article
                     className="companyCard"
                     key={company.id}
                   >
+                    {/* 업체 대표사진 */}
+
                     <div className="companyImage">
-                      {company.images.length > 0 ? (
+                      {companyImage ? (
                         <img
-                          src={company.images[0]}
-                          alt={`${company.name} 시공사례`}
+                          src={companyImage}
+                          alt={`${company.name} 대표 이미지`}
                           loading="lazy"
+                          style={
+                            isEasyHomecare(company)
+                              ? {
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "contain",
+                                  background: "#ffffff",
+                                }
+                              : undefined
+                          }
                         />
                       ) : (
                         <span aria-hidden="true">
@@ -490,6 +546,8 @@ export default function Home() {
                         </span>
                       )}
                     </div>
+
+                    {/* 업체 정보 */}
 
                     <div className="companyContent">
                       <span className="companyBadge">
@@ -515,6 +573,8 @@ export default function Home() {
                           {company.services.join(", ")}
                         </span>
                       </div>
+
+                      {/* 상세보기 및 전화 문의 */}
 
                       <div className="companyActions">
                         {website ? (
