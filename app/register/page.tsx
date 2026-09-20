@@ -1,14 +1,17 @@
+
 "use client";
 
 import Link from "next/link";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { regions, services } from "../data";
+import Footer from "../Footer";
 
 type ApplicationData = {
   name: string;
   owner: string;
   phone: string;
+  website_url: string | null;
   description: string;
   regions: string[];
   services: string[];
@@ -23,19 +26,63 @@ type SupabaseError = {
   hint?: string | null;
 };
 
+/* =====================================
+   홈페이지 주소 확인
+===================================== */
+
+function normalizeWebsiteUrl(value: string): string | null {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  const withProtocol = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+
+  try {
+    const parsed = new URL(withProtocol);
+
+    if (
+      !["http:", "https:"].includes(parsed.protocol) ||
+      !parsed.hostname.includes(".") ||
+      parsed.username ||
+      parsed.password
+    ) {
+      return null;
+    }
+
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+/* =====================================
+   업체 등록 페이지
+===================================== */
+
 export default function RegisterPage() {
   const [name, setName] = useState("");
   const [owner, setOwner] = useState("");
   const [phone, setPhone] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
   const [description, setDescription] = useState("");
 
-  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [selectedRegions, setSelectedRegions] =
+    useState<string[]>([]);
+
+  const [selectedServices, setSelectedServices] =
+    useState<string[]>([]);
 
   const [preview, setPreview] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const normalizedWebsiteUrl =
+    normalizeWebsiteUrl(websiteUrl);
 
   function toggle(
     value: string,
@@ -56,6 +103,10 @@ export default function RegisterPage() {
     });
   }
 
+  /* =====================================
+     신청 내용 확인
+  ===================================== */
+
   function handlePreview(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
@@ -73,7 +124,16 @@ export default function RegisterPage() {
       selectedRegions.length === 0 ||
       selectedServices.length === 0
     ) {
-      setErrorMessage("서비스 지역과 시공 분야를 선택해 주세요.");
+      setErrorMessage(
+        "서비스 지역과 시공 분야를 선택해 주세요."
+      );
+      return;
+    }
+
+    if (websiteUrl.trim() && !normalizedWebsiteUrl) {
+      setErrorMessage(
+        "홈페이지 주소를 확인해 주세요. 예: https://example.com"
+      );
       return;
     }
 
@@ -81,6 +141,10 @@ export default function RegisterPage() {
     setPreview(true);
     scrollToTop();
   }
+
+  /* =====================================
+     Supabase에 신청서 저장
+  ===================================== */
 
   async function handleFinalSubmit() {
     if (submitting || submitted) return;
@@ -105,6 +169,7 @@ export default function RegisterPage() {
         name: name.trim(),
         owner: owner.trim(),
         phone: phone.trim(),
+        website_url: normalizedWebsiteUrl,
         description: description.trim(),
         regions: selectedRegions,
         services: selectedServices,
@@ -163,7 +228,10 @@ export default function RegisterPage() {
         throw new Error(
           `신청 저장에 실패했습니다.\n` +
             `HTTP 오류 코드: ${response.status}\n` +
-            `${errorDetails || "서버에서 오류 내용을 반환하지 않았습니다."}`
+            `${
+              errorDetails ||
+              "서버에서 오류 내용을 반환하지 않았습니다."
+            }`
         );
       }
 
@@ -195,6 +263,8 @@ export default function RegisterPage() {
 
   return (
     <main>
+      {/* 상단 메뉴 */}
+
       <header className="header">
         <Link href="/" className="logo">
           🏠 집수리모아
@@ -204,6 +274,8 @@ export default function RegisterPage() {
           업체 찾기
         </Link>
       </header>
+
+      {/* 상단 소개 */}
 
       <section className="pageHero">
         <div className="container">
@@ -219,6 +291,10 @@ export default function RegisterPage() {
       <section className="section container">
         <div className="registerCard">
           {submitted ? (
+            /* =====================================
+               신청 완료
+            ===================================== */
+
             <div className="formGroup">
               <h2>등록 신청이 접수되었습니다! 🎉</h2>
 
@@ -236,6 +312,23 @@ export default function RegisterPage() {
                 <strong>연락처:</strong> {phone}
               </p>
 
+              {normalizedWebsiteUrl && (
+                <p>
+                  <strong>홈페이지:</strong>{" "}
+                  <a
+                    href={normalizedWebsiteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: "#2563eb",
+                      overflowWrap: "anywhere",
+                    }}
+                  >
+                    {normalizedWebsiteUrl}
+                  </a>
+                </p>
+              )}
+
               <p className="formHint">
                 신청서를 제출했다고 해서 업체 목록에
                 즉시 공개되는 것은 아닙니다.
@@ -246,6 +339,10 @@ export default function RegisterPage() {
               </Link>
             </div>
           ) : preview ? (
+            /* =====================================
+               신청 내용 미리보기
+            ===================================== */
+
             <div className="formGroup">
               <h2>등록 신청 내용 확인</h2>
 
@@ -264,6 +361,25 @@ export default function RegisterPage() {
 
               <p>
                 <strong>연락처:</strong> {phone}
+              </p>
+
+              <p>
+                <strong>홈페이지:</strong>{" "}
+                {normalizedWebsiteUrl ? (
+                  <a
+                    href={normalizedWebsiteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: "#2563eb",
+                      overflowWrap: "anywhere",
+                    }}
+                  >
+                    {normalizedWebsiteUrl}
+                  </a>
+                ) : (
+                  "등록하지 않음"
+                )}
               </p>
 
               <p>
@@ -332,6 +448,10 @@ export default function RegisterPage() {
               </button>
             </div>
           ) : (
+            /* =====================================
+               업체 등록 신청서
+            ===================================== */
+
             <form onSubmit={handlePreview}>
               <h2>업체 기본정보</h2>
 
@@ -382,6 +502,34 @@ export default function RegisterPage() {
                   }
                   placeholder="010-0000-0000"
                 />
+              </div>
+
+              {/* 홈페이지 주소 입력 */}
+
+              <div className="formGroup">
+                <label htmlFor="companyWebsite">
+                  업체 홈페이지 주소 (선택)
+                </label>
+
+                <input
+                  id="companyWebsite"
+                  type="text"
+                  inputMode="url"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  value={websiteUrl}
+                  onChange={(e) =>
+                    setWebsiteUrl(e.target.value)
+                  }
+                  placeholder="https://example.com"
+                />
+
+                <p className="formHint">
+                  홈페이지가 있다면 주소를 입력해 주세요.
+                  승인 후 고객이 상세보기 버튼을 눌렀을 때
+                  해당 홈페이지로 이동하도록 연결할 예정입니다.
+                  홈페이지가 없다면 비워두셔도 됩니다.
+                </p>
               </div>
 
               <div className="formGroup">
@@ -490,6 +638,8 @@ export default function RegisterPage() {
           )}
         </div>
       </section>
+
+      <Footer />
     </main>
   );
 }
