@@ -3,10 +3,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 /* =====================================
-   집수리모아 대표 주소
+   집수리모아 대표 도메인
 ===================================== */
 
-const SITE_URL = "https://jipsurimoa.vercel.app";
+const SITE_URL = "https://www.jipsurimoa.com";
 
 const SITE_NAME = "집수리모아";
 
