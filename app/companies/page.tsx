@@ -17,7 +17,7 @@ import type { Company } from "../data";
 import Footer from "../Footer";
 
 /* =====================================
-   이지종합건설 설정
+   이지종합건설 기존 설정
 ===================================== */
 
 const EASY_HOMECARE_URL =
@@ -31,17 +31,23 @@ const EASY_HOMECARE_IMAGE =
 ===================================== */
 
 const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(
-    /\/rest\/v1\/?$/,
-    ""
-  ) ?? "";
+  process.env.NEXT_PUBLIC_SUPABASE_URL
+    ?.replace(/\/rest\/v1\/?$/, "")
+    .replace(/\/$/, "") ?? "";
 
 const SUPABASE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
 /* =====================================
    업체 데이터 타입
+
+   기존 Company 타입은 유지하면서
+   홈페이지 주소만 추가합니다.
 ===================================== */
+
+type CompanyWithWebsite = Company & {
+  website_url: string | null;
+};
 
 type CompanyRow = {
   id: string;
@@ -51,9 +57,12 @@ type CompanyRow = {
   regions: string[] | null;
   services: string[] | null;
   images: string[] | null;
+  website_url: string | null;
 };
 
-function toCompany(row: CompanyRow): Company {
+function toCompany(
+  row: CompanyRow
+): CompanyWithWebsite {
   return {
     id: row.id,
     name: row.name ?? "",
@@ -68,6 +77,7 @@ function toCompany(row: CompanyRow): Company {
     images: Array.isArray(row.images)
       ? row.images
       : [],
+    website_url: row.website_url ?? null,
   };
 }
 
@@ -76,7 +86,7 @@ function toCompany(row: CompanyRow): Company {
 ===================================== */
 
 function isEasyHomecare(
-  company: Company
+  company: CompanyWithWebsite
 ): boolean {
   return (
     company.name.replace(/\s+/g, "").trim() ===
@@ -85,12 +95,56 @@ function isEasyHomecare(
 }
 
 /* =====================================
-   업체별 홈페이지 연결
+   홈페이지 주소 안전하게 확인
+
+   http 또는 https 주소만 연결합니다.
+===================================== */
+
+function getSafeWebsiteUrl(
+  value: string | null
+): string | null {
+  if (!value?.trim()) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value.trim());
+
+    if (
+      !["https:", "http:"].includes(
+        url.protocol
+      ) ||
+      !url.hostname.includes(".") ||
+      url.username ||
+      url.password
+    ) {
+      return null;
+    }
+
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+/* =====================================
+   업체별 홈페이지 자동 연결
+
+   1. 업체가 등록한 홈페이지 주소 우선
+   2. 이지종합건설 기존 주소 유지
+   3. 주소가 없으면 내부 상세페이지 사용
 ===================================== */
 
 function getCompanyWebsite(
-  company: Company
+  company: CompanyWithWebsite
 ): string | null {
+  const registeredWebsite =
+    getSafeWebsiteUrl(company.website_url);
+
+  if (registeredWebsite) {
+    return registeredWebsite;
+  }
+
   if (isEasyHomecare(company)) {
     return EASY_HOMECARE_URL;
   }
@@ -103,7 +157,7 @@ function getCompanyWebsite(
 ===================================== */
 
 function getCompanyImage(
-  company: Company
+  company: CompanyWithWebsite
 ): string | null {
   if (isEasyHomecare(company)) {
     return EASY_HOMECARE_IMAGE;
@@ -122,7 +176,7 @@ function getCompanyImage(
 
 export default function CompaniesPage() {
   const [companies, setCompanies] =
-    useState<Company[]>([]);
+    useState<CompanyWithWebsite[]>([]);
 
   const [region, setRegion] = useState("");
   const [service, setService] = useState("");
@@ -149,7 +203,7 @@ export default function CompaniesPage() {
 
     try {
       const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/approved_companies?select=id,name,description,phone,regions,services,images`,
+        `${SUPABASE_URL}/rest/v1/approved_companies?select=id,name,description,phone,regions,services,images,website_url`,
         {
           method: "GET",
           headers: {
