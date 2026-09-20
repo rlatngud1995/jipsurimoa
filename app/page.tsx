@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+
 import {
   useCallback,
   useEffect,
@@ -10,10 +11,13 @@ import {
 } from "react";
 
 import { regions, services } from "./data";
+
 import type { Company } from "./data";
 
+import Footer from "./Footer";
+
 /* =====================================
-   기본 설정
+   이지종합건설 설정
 ===================================== */
 
 const EASY_HOMECARE_URL =
@@ -34,6 +38,10 @@ const SUPABASE_URL =
 
 const SUPABASE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+
+/* =====================================
+   업체 데이터 타입
+===================================== */
 
 type CompanyRow = {
   id: string;
@@ -64,7 +72,7 @@ function toCompany(row: CompanyRow): Company {
 }
 
 /* =====================================
-   이지종합건설 업체 확인
+   이지종합건설 확인
 ===================================== */
 
 function isEasyHomecare(
@@ -77,7 +85,7 @@ function isEasyHomecare(
 }
 
 /* =====================================
-   업체별 홈페이지 연결
+   업체별 홈페이지
 ===================================== */
 
 function getCompanyWebsite(
@@ -200,7 +208,8 @@ export default function Home() {
         );
       }
 
-      const rows: unknown = await response.json();
+      const rows: unknown =
+        await response.json();
 
       if (!Array.isArray(rows)) {
         throw new Error(
@@ -649,24 +658,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 하단 정보 */}
+      {/* 공통 하단 사업자 정보 */}
 
-      <footer className="footer">
-        <div className="container">
-          <strong>
-            집수리모아
-          </strong>
-
-          <p>
-            전국 집수리 업체 검색 및 연결 플랫폼
-          </p>
-
-          <small>
-            © 2026 집수리모아.
-            All rights reserved.
-          </small>
-        </div>
-      </footer>
+      <Footer />
     </main>
   );
 }
