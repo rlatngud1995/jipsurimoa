@@ -1,18 +1,20 @@
 
-/* ============================================
-   집수리모아 시공 서비스 사이트맵
+import { NextResponse } from "next/server";
 
-   주소:
-   https://www.jipsurimoa.com/services-sitemap.xml
+/* =========================================
+   집수리모아 서비스별 지역 사이트맵
 
-   포함:
-   1. 시공 카테고리
-   2. 전국 17개 시·도
-   3. 해당 서비스·지역에 업체가 있는 시·군·구
-   4. 업체 등록 지역에 명시된 읍·면·동
+   파일:
+   app/services-sitemap.xml/route.ts
 
-   기존 홈페이지 및 다른 사이트맵은 수정하지 않음
-============================================ */
+   생성 주소 예시:
+   /services/cooktop/seoul
+   /services/cooktop/seoul/gangnam
+   /services/cooktop/gyeonggi/ansan
+   /services/sink/gyeonggi/suwon
+
+   시·도 및 시·군·구 주소는 영어로 통일
+========================================= */
 
 const SITE_URL = "https://www.jipsurimoa.com";
 
@@ -27,472 +29,458 @@ const SUPABASE_KEY =
 
 type Service = {
   slug: string;
-  keywords: string[];
+  matches: string[];
 };
 
-type Province = {
+type District = {
   slug: string;
-  aliases: string[];
-  districts: string[];
+  name: string;
 };
 
-type CompanyRow = {
+type Region = {
+  slug: string;
+  name: string;
+  aliases: string[];
+  districts: string;
+};
+
+type Company = {
+  id: string | number;
   regions: string[] | null;
   services: string[] | null;
 };
 
+/* =========================================
+   서비스 카테고리
+
+   서비스 페이지 코드와 동일하게 설정
+========================================= */
+
 const SERVICES: Service[] = [
   {
     slug: "repair",
-    keywords: ["종합 집수리", "집수리"],
+    matches: ["집수리", "종합수리"],
   },
   {
     slug: "sink",
-    keywords: ["싱크볼", "싱크대"],
+    matches: ["싱크볼", "싱크대", "싱크"],
   },
   {
     slug: "cooktop",
-    keywords: ["쿡탑", "인덕션", "가스레인지"],
+    matches: [
+      "쿡탑",
+      "인덕션",
+      "가스레인지",
+      "가스렌지",
+    ],
   },
   {
     slug: "tree",
-    keywords: ["벌목", "조경", "나무 제거"],
+    matches: [
+      "벌목",
+      "조경",
+      "나무제거",
+      "위험목",
+    ],
   },
   {
     slug: "aircon",
-    keywords: ["에어컨"],
+    matches: ["에어컨"],
   },
   {
     slug: "faucet",
-    keywords: ["수전"],
+    matches: ["수전"],
   },
   {
     slug: "petdoor",
-    keywords: ["펫도어"],
+    matches: ["펫도어"],
   },
   {
     slug: "refrigerator",
-    keywords: ["냉장고 철거"],
+    matches: [
+      "냉장고철거",
+      "냉장고장철거",
+    ],
   },
 ];
 
-const PROVINCES: Province[] = [
+/* =========================================
+   전국 지역별 영어 주소
+
+   서비스 페이지 코드와 동일한
+   영어 slug를 사용해야 함
+========================================= */
+
+const REGIONS: Region[] = [
   {
     slug: "seoul",
-    aliases: ["서울특별시", "서울시", "서울"],
-    districts: [
-      "강남구", "강동구", "강북구", "강서구",
-      "관악구", "광진구", "구로구", "금천구",
-      "노원구", "도봉구", "동대문구", "동작구",
-      "마포구", "서대문구", "서초구", "성동구",
-      "성북구", "송파구", "양천구", "영등포구",
-      "용산구", "은평구", "종로구", "중구",
-      "중랑구",
-    ],
-  },
-  {
-    slug: "busan",
-    aliases: ["부산광역시", "부산시", "부산"],
-    districts: [
-      "강서구", "금정구", "기장군", "남구",
-      "동구", "동래구", "부산진구", "북구",
-      "사상구", "사하구", "서구", "수영구",
-      "연제구", "영도구", "중구", "해운대구",
-    ],
-  },
-  {
-    slug: "daegu",
-    aliases: ["대구광역시", "대구시", "대구"],
-    districts: [
-      "군위군", "남구", "달서구", "달성군",
-      "동구", "북구", "서구", "수성구", "중구",
-    ],
-  },
-  {
-    slug: "incheon",
-    aliases: ["인천광역시", "인천시", "인천"],
-    districts: [
-      "강화군", "계양구", "남동구", "동구",
-      "미추홀구", "부평구", "서구", "연수구",
-      "옹진군", "중구",
-    ],
-  },
-  {
-    slug: "gwangju",
-    aliases: ["광주광역시", "광주시", "광주"],
-    districts: [
-      "광산구", "남구", "동구", "북구", "서구",
-    ],
-  },
-  {
-    slug: "daejeon",
-    aliases: ["대전광역시", "대전시", "대전"],
-    districts: [
-      "대덕구", "동구", "서구", "유성구", "중구",
-    ],
-  },
-  {
-    slug: "ulsan",
-    aliases: ["울산광역시", "울산시", "울산"],
-    districts: [
-      "남구", "동구", "북구", "울주군", "중구",
-    ],
-  },
-  {
-    slug: "sejong",
-    aliases: ["세종특별자치시", "세종시", "세종"],
-    districts: [],
+    name: "서울",
+    aliases: ["서울", "서울시", "서울특별시"],
+    districts:
+      "gangnam:강남구,gangdong:강동구,gangbuk:강북구,gangseo:강서구,gwanak:관악구,gwangjin:광진구,guro:구로구,geumcheon:금천구,nowon:노원구,dobong:도봉구,dongdaemun:동대문구,dongjak:동작구,mapo:마포구,seodaemun:서대문구,seocho:서초구,seongdong:성동구,seongbuk:성북구,songpa:송파구,yangcheon:양천구,yeongdeungpo:영등포구,yongsan:용산구,eunpyeong:은평구,jongno:종로구,jung:중구,jungnang:중랑구",
   },
   {
     slug: "gyeonggi",
-    aliases: ["경기도", "경기"],
-    districts: [
-      "가평군", "고양시", "과천시", "광명시",
-      "광주시", "구리시", "군포시", "김포시",
-      "남양주시", "동두천시", "부천시", "성남시",
-      "수원시", "시흥시", "안산시", "안성시",
-      "안양시", "양주시", "양평군", "여주시",
-      "연천군", "오산시", "용인시", "의왕시",
-      "의정부시", "이천시", "파주시", "평택시",
-      "포천시", "하남시", "화성시",
-    ],
+    name: "경기",
+    aliases: ["경기", "경기도"],
+    districts:
+      "gapyeong:가평군,goyang:고양시,gwacheon:과천시,gwangmyeong:광명시,gwangju:광주시,guri:구리시,gunpo:군포시,gimpo:김포시,namyangju:남양주시,dongducheon:동두천시,bucheon:부천시,seongnam:성남시,suwon:수원시,siheung:시흥시,ansan:안산시,anseong:안성시,anyang:안양시,yangju:양주시,yangpyeong:양평군,yeoju:여주시,yeoncheon:연천군,osan:오산시,yongin:용인시,uiwang:의왕시,uijeongbu:의정부시,icheon:이천시,paju:파주시,pyeongtaek:평택시,pocheon:포천시,hanam:하남시,hwaseong:화성시",
+  },
+  {
+    slug: "incheon",
+    name: "인천",
+    aliases: ["인천", "인천시", "인천광역시"],
+    districts:
+      "ganghwa:강화군,gyeyang:계양구,namdong:남동구,dong:동구,michuhol:미추홀구,bupyeong:부평구,seo:서구,yeonsu:연수구,ongjin:옹진군,jung:중구",
+  },
+  {
+    slug: "busan",
+    name: "부산",
+    aliases: ["부산", "부산시", "부산광역시"],
+    districts:
+      "gangseo:강서구,geumjeong:금정구,gijang:기장군,nam:남구,dong:동구,dongnae:동래구,busanjin:부산진구,buk:북구,sasang:사상구,saha:사하구,seo:서구,suyeong:수영구,yeonje:연제구,yeongdo:영도구,jung:중구,haeundae:해운대구",
+  },
+  {
+    slug: "daegu",
+    name: "대구",
+    aliases: ["대구", "대구시", "대구광역시"],
+    districts:
+      "gunwi:군위군,nam:남구,dalseo:달서구,dalseong:달성군,dong:동구,buk:북구,seo:서구,suseong:수성구,jung:중구",
+  },
+  {
+    slug: "gwangju",
+    name: "광주",
+    aliases: ["광주", "광주광역시"],
+    districts:
+      "gwangsan:광산구,nam:남구,dong:동구,buk:북구,seo:서구",
+  },
+  {
+    slug: "daejeon",
+    name: "대전",
+    aliases: ["대전", "대전시", "대전광역시"],
+    districts:
+      "daedeok:대덕구,dong:동구,seo:서구,yuseong:유성구,jung:중구",
+  },
+  {
+    slug: "ulsan",
+    name: "울산",
+    aliases: ["울산", "울산시", "울산광역시"],
+    districts:
+      "nam:남구,dong:동구,buk:북구,ulju:울주군,jung:중구",
+  },
+  {
+    slug: "sejong",
+    name: "세종",
+    aliases: ["세종", "세종시", "세종특별자치시"],
+    districts: "",
   },
   {
     slug: "gangwon",
-    aliases: ["강원특별자치도", "강원도", "강원"],
-    districts: [
-      "강릉시", "고성군", "동해시", "삼척시",
-      "속초시", "양구군", "양양군", "영월군",
-      "원주시", "인제군", "정선군", "철원군",
-      "춘천시", "태백시", "평창군", "홍천군",
-      "화천군", "횡성군",
+    name: "강원",
+    aliases: [
+      "강원",
+      "강원도",
+      "강원특별자치도",
     ],
+    districts:
+      "gangneung:강릉시,goseong:고성군,donghae:동해시,samcheok:삼척시,sokcho:속초시,yanggu:양구군,yangyang:양양군,yeongwol:영월군,wonju:원주시,inje:인제군,jeongseon:정선군,cheorwon:철원군,chuncheon:춘천시,taebaek:태백시,pyeongchang:평창군,hongcheon:홍천군,hwacheon:화천군,hoengseong:횡성군",
   },
   {
     slug: "chungbuk",
-    aliases: ["충청북도", "충북"],
-    districts: [
-      "괴산군", "단양군", "보은군", "영동군",
-      "옥천군", "음성군", "제천시", "증평군",
-      "진천군", "청주시", "충주시",
-    ],
+    name: "충북",
+    aliases: ["충북", "충청북도"],
+    districts:
+      "goesan:괴산군,danyang:단양군,boeun:보은군,yeongdong:영동군,okcheon:옥천군,eumseong:음성군,jecheon:제천시,jeungpyeong:증평군,jincheon:진천군,cheongju:청주시,chungju:충주시",
   },
   {
     slug: "chungnam",
-    aliases: ["충청남도", "충남"],
-    districts: [
-      "계룡시", "공주시", "금산군", "논산시",
-      "당진시", "보령시", "부여군", "서산시",
-      "서천군", "아산시", "예산군", "천안시",
-      "청양군", "태안군", "홍성군",
-    ],
+    name: "충남",
+    aliases: ["충남", "충청남도"],
+    districts:
+      "gyeryong:계룡시,gongju:공주시,geumsan:금산군,nonsan:논산시,dangjin:당진시,boryeong:보령시,buyeo:부여군,seosan:서산시,seocheon:서천군,asan:아산시,yesan:예산군,cheonan:천안시,cheongyang:청양군,taean:태안군,hongseong:홍성군",
   },
   {
     slug: "jeonbuk",
+    name: "전북",
     aliases: [
-      "전북특별자치도",
-      "전라북도",
       "전북",
+      "전라북도",
+      "전북특별자치도",
     ],
-    districts: [
-      "고창군", "군산시", "김제시", "남원시",
-      "무주군", "부안군", "순창군", "완주군",
-      "익산시", "임실군", "장수군", "전주시",
-      "정읍시", "진안군",
-    ],
+    districts:
+      "gochang:고창군,gunsan:군산시,gimje:김제시,namwon:남원시,muju:무주군,buan:부안군,sunchang:순창군,wanju:완주군,iksan:익산시,imsil:임실군,jangsu:장수군,jeonju:전주시,jeongeup:정읍시,jinan:진안군",
   },
   {
     slug: "jeonnam",
-    aliases: ["전라남도", "전남"],
-    districts: [
-      "강진군", "고흥군", "곡성군", "광양시",
-      "구례군", "나주시", "담양군", "목포시",
-      "무안군", "보성군", "순천시", "신안군",
-      "여수시", "영광군", "영암군", "완도군",
-      "장성군", "장흥군", "진도군", "함평군",
-      "해남군", "화순군",
-    ],
+    name: "전남",
+    aliases: ["전남", "전라남도"],
+    districts:
+      "gangjin:강진군,goheung:고흥군,gokseong:곡성군,gwangyang:광양시,gurye:구례군,naju:나주시,damyang:담양군,mokpo:목포시,muan:무안군,boseong:보성군,suncheon:순천시,sinan:신안군,yeosu:여수시,yeonggwang:영광군,yeongam:영암군,wando:완도군,jangseong:장성군,jangheung:장흥군,jindo:진도군,hampyeong:함평군,haenam:해남군,hwasun:화순군",
   },
   {
     slug: "gyeongbuk",
-    aliases: ["경상북도", "경북"],
-    districts: [
-      "경산시", "경주시", "고령군", "구미시",
-      "김천시", "문경시", "봉화군", "상주시",
-      "성주군", "안동시", "영덕군", "영양군",
-      "영주시", "영천시", "예천군", "울릉군",
-      "울진군", "의성군", "청도군", "청송군",
-      "칠곡군", "포항시",
-    ],
+    name: "경북",
+    aliases: ["경북", "경상북도"],
+    districts:
+      "gyeongsan:경산시,gyeongju:경주시,goryeong:고령군,gumi:구미시,gimcheon:김천시,mungyeong:문경시,bonghwa:봉화군,sangju:상주시,seongju:성주군,andong:안동시,yeongdeok:영덕군,yeongyang:영양군,yeongju:영주시,yeongcheon:영천시,yecheon:예천군,ulleung:울릉군,uljin:울진군,uiseong:의성군,cheongdo:청도군,cheongsong:청송군,chilgok:칠곡군,pohang:포항시",
   },
   {
     slug: "gyeongnam",
-    aliases: ["경상남도", "경남"],
-    districts: [
-      "거제시", "거창군", "고성군", "김해시",
-      "남해군", "밀양시", "사천시", "산청군",
-      "양산시", "의령군", "진주시", "창녕군",
-      "창원시", "통영시", "하동군", "함안군",
-      "함양군", "합천군",
-    ],
+    name: "경남",
+    aliases: ["경남", "경상남도"],
+    districts:
+      "geoje:거제시,geochang:거창군,goseong:고성군,gimhae:김해시,namhae:남해군,miryang:밀양시,sacheon:사천시,sancheong:산청군,yangsan:양산시,uiryeong:의령군,jinju:진주시,changnyeong:창녕군,changwon:창원시,tongyeong:통영시,hadong:하동군,haman:함안군,hamyang:함양군,hapcheon:합천군",
   },
   {
     slug: "jeju",
+    name: "제주",
     aliases: [
-      "제주특별자치도",
-      "제주도",
       "제주",
+      "제주도",
+      "제주특별자치도",
     ],
-    districts: ["서귀포시", "제주시"],
+    districts:
+      "seogwipo:서귀포시,jeju:제주시",
   },
 ];
 
-/* ============================================
-   문자열 및 서비스 비교
-============================================ */
+/* =========================================
+   공통 함수
+========================================= */
 
-function compact(value: string): string {
+function normalize(value: string): string {
   return value.replace(/\s+/g, "").trim();
 }
 
+function getDistricts(
+  region: Region
+): District[] {
+  if (!region.districts) return [];
+
+  return region.districts
+    .split(",")
+    .map((entry) => {
+      const [slug, name] = entry.split(":");
+
+      return {
+        slug,
+        name,
+      };
+    });
+}
+
+function makeUrl(
+  service: string,
+  location: string[] = []
+): string {
+  const path = [
+    "services",
+    service,
+    ...location,
+  ].join("/");
+
+  return `${SITE_URL}/${path}`;
+}
+
+/* =========================================
+   승인 업체 조회
+========================================= */
+
+async function loadCompanies(): Promise<Company[]> {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.error(
+      "사이트맵: Supabase 환경변수가 없습니다."
+    );
+
+    return [];
+  }
+
+  const companies: Company[] = [];
+  const pageSize = 500;
+
+  try {
+    for (
+      let offset = 0;
+      ;
+      offset += pageSize
+    ) {
+      const params = new URLSearchParams({
+        select: "id,regions,services",
+        limit: String(pageSize),
+        offset: String(offset),
+      });
+
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/approved_companies?${params.toString()}`,
+        {
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization:
+              `Bearer ${SUPABASE_KEY}`,
+          },
+          cache: "no-store",
+        }
+      );
+
+      if (!response.ok) {
+        console.error(
+          "사이트맵 업체 조회 실패:",
+          response.status
+        );
+
+        break;
+      }
+
+      const rows =
+        (await response.json()) as Company[];
+
+      companies.push(...rows);
+
+      if (rows.length < pageSize) {
+        break;
+      }
+    }
+  } catch (error) {
+    console.error(
+      "사이트맵 업체 조회 오류:",
+      error
+    );
+  }
+
+  return companies;
+}
+
+/* =========================================
+   업체 서비스 일치 여부
+========================================= */
+
 function matchesService(
-  company: CompanyRow,
+  company: Company,
   service: Service
 ): boolean {
   return (company.services ?? []).some(
-    (registered) => {
-      const value = compact(registered);
-
-      return service.keywords.some((keyword) =>
-        value.includes(compact(keyword))
-      );
-    }
+    (registered) =>
+      service.matches.some(
+        (keyword) =>
+          normalize(registered).includes(
+            normalize(keyword)
+          )
+      )
   );
 }
 
-function isNationwide(value: string): boolean {
-  return [
-    "전국",
-    "전국전체",
-    "전국전지역",
-    "전국시공",
-  ].includes(compact(value));
-}
+/* =========================================
+   업체 지역 일치 여부
 
-function isCapitalArea(value: string): boolean {
-  return [
-    "수도권",
-    "수도권전체",
-    "수도권전지역",
-  ].includes(compact(value));
-}
+   서울 전 지역 등록 업체:
+   서울 및 서울 25개 구에 표시
 
-function getProvinceRemainder(
+   경기 안산시 등록 업체:
+   경기 및 안산시에 표시
+========================================= */
+
+function getRegionRemainder(
   registered: string,
-  province: Province
+  region: Region
 ): string | null {
-  const value = compact(registered);
+  const value = normalize(registered);
 
-  const alias = [...province.aliases]
-    .sort((a, b) => b.length - a.length)
-    .find((item) =>
-      value.startsWith(compact(item))
+  const alias = [...region.aliases]
+    .sort(
+      (a, b) =>
+        b.length - a.length
+    )
+    .find((name) =>
+      value.startsWith(
+        normalize(name)
+      )
     );
 
   if (!alias) return null;
 
-  return value.slice(compact(alias).length);
+  return value.slice(
+    normalize(alias).length
+  );
 }
 
-function isWholeProvince(
-  remainder: string
+function isWholeArea(
+  value: string
 ): boolean {
   return [
     "",
     "전체",
     "전지역",
     "전역",
-  ].includes(remainder);
+  ].includes(value);
 }
 
-/* ============================================
-   시·군·구 등록 지역 비교
-============================================ */
-
-function matchesDistrict(
-  company: CompanyRow,
-  province: Province,
-  district: string
+function matchesRegion(
+  company: Company,
+  region: Region,
+  district?: District
 ): boolean {
-  const targetDistrict = compact(district);
-
   return (company.regions ?? []).some(
     (registered) => {
-      const value = compact(registered);
-
-      if (isNationwide(value)) {
-        return true;
-      }
+      const value =
+        normalize(registered);
 
       if (
-        ["seoul", "gyeonggi", "incheon"].includes(
-          province.slug
-        ) &&
-        isCapitalArea(value)
+        [
+          "전국",
+          "전국전체",
+          "전국전지역",
+        ].includes(value)
       ) {
         return true;
       }
 
-      const remainder = getProvinceRemainder(
-        registered,
-        province
-      );
+      if (
+        [
+          "seoul",
+          "gyeonggi",
+          "incheon",
+        ].includes(region.slug) &&
+        [
+          "수도권",
+          "수도권전체",
+          "수도권전지역",
+        ].includes(value)
+      ) {
+        return true;
+      }
+
+      const remainder =
+        getRegionRemainder(
+          registered,
+          region
+        );
 
       if (remainder === null) {
         return false;
       }
 
-      if (isWholeProvince(remainder)) {
+      if (isWholeArea(remainder)) {
+        return true;
+      }
+
+      if (!district) {
         return true;
       }
 
       return remainder.startsWith(
-        targetDistrict
+        normalize(district.name)
       );
     }
   );
 }
 
-/* ============================================
-   업체가 명시한 읍·면·동 추출
+/* =========================================
+   XML 특수문자 처리
+========================================= */
 
-   예:
-   서울특별시 서초구 반포동
-   → 서초구 / 반포동
-
-   서울 전체, 전국 등의 등록 정보에서
-   동 이름을 임의로 만들지 않습니다.
-============================================ */
-
-function getRegisteredNeighborhoods(
-  company: CompanyRow,
-  province: Province,
-  district: string
-): string[] {
-  const neighborhoods = new Set<string>();
-  const targetDistrict = compact(district);
-
-  for (const registered of company.regions ?? []) {
-    const remainder = getProvinceRemainder(
-      registered,
-      province
-    );
-
-    if (
-      remainder === null ||
-      !remainder.startsWith(targetDistrict)
-    ) {
-      continue;
-    }
-
-    const afterDistrict = remainder.slice(
-      targetDistrict.length
-    );
-
-    if (!afterDistrict) {
-      continue;
-    }
-
-    /*
-      '반포동', '배방읍', '광혜원면'처럼
-      업체가 직접 입력한 하위 지역만 사용.
-
-      여러 지역이 한 문자열에 섞인 경우
-      잘못된 주소가 생성되지 않도록 제외.
-    */
-    if (
-      !/^[가-힣0-9]+(?:동|읍|면)$/.test(
-        afterDistrict
-      )
-    ) {
-      continue;
-    }
-
-    neighborhoods.add(afterDistrict);
-  }
-
-  return [...neighborhoods];
-}
-
-/* ============================================
-   Supabase 승인 업체 조회
-============================================ */
-
-async function loadCompanies(): Promise<
-  CompanyRow[]
-> {
-  if (!SUPABASE_URL || !SUPABASE_KEY) {
-    throw new Error(
-      "Supabase 환경변수가 설정되지 않았습니다."
-    );
-  }
-
-  const allRows: CompanyRow[] = [];
-  const pageSize = 500;
-  let offset = 0;
-
-  while (true) {
-    const params = new URLSearchParams({
-      select: "regions,services",
-      limit: String(pageSize),
-      offset: String(offset),
-    });
-
-    const response = await fetch(
-      `${SUPABASE_URL}/rest/v1/approved_companies?${params.toString()}`,
-      {
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
-        },
-        cache: "no-store",
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `승인 업체 조회 실패: ${response.status}`
-      );
-    }
-
-    const data: unknown =
-      await response.json();
-
-    if (!Array.isArray(data)) {
-      throw new Error(
-        "승인 업체 데이터 형식이 올바르지 않습니다."
-      );
-    }
-
-    const rows = data as CompanyRow[];
-
-    allRows.push(...rows);
-
-    if (rows.length < pageSize) {
-      break;
-    }
-
-    offset += pageSize;
-  }
-
-  return allRows;
-}
-
-/* ============================================
-   XML 생성
-============================================ */
-
-function escapeXml(value: string): string {
+function escapeXml(
+  value: string
+): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -501,182 +489,105 @@ function escapeXml(value: string): string {
     .replace(/'/g, "&apos;");
 }
 
-function makeLocationPath(
-  serviceSlug: string,
-  provinceSlug: string,
-  district?: string,
-  neighborhood?: string
-): string {
-  const segments = [
-    "services",
-    serviceSlug,
-    provinceSlug,
-  ];
-
-  if (district) {
-    segments.push(
-      encodeURIComponent(district)
-    );
-  }
-
-  if (neighborhood) {
-    segments.push(
-      encodeURIComponent(neighborhood)
-    );
-  }
-
-  return `/${segments.join("/")}`;
-}
-
-/* ============================================
-   사이트맵 응답
-============================================ */
+/* =========================================
+   사이트맵 생성
+========================================= */
 
 export async function GET() {
-  const paths = new Set<string>();
+  const companies =
+    await loadCompanies();
 
-  /*
-    1. 기존 서비스 카테고리 주소
-    2. 기존 17개 시·도 주소
-  */
+  const urls =
+    new Set<string>();
+
   for (const service of SERVICES) {
-    paths.add(
-      `/services/${service.slug}`
+    /*
+      1. 서비스 카테고리 기본 페이지
+    */
+
+    urls.add(
+      makeUrl(service.slug)
     );
 
-    for (const province of PROVINCES) {
-      paths.add(
-        makeLocationPath(
+    const serviceCompanies =
+      companies.filter(
+        (company) =>
+          matchesService(
+            company,
+            service
+          )
+      );
+
+    /*
+      2. 전국 17개 시·도 페이지
+    */
+
+    for (const region of REGIONS) {
+      urls.add(
+        makeUrl(
           service.slug,
-          province.slug
+          [region.slug]
         )
       );
-    }
-  }
 
-  try {
-    const companies = await loadCompanies();
+      /*
+        3. 등록 업체가 있는 시·군·구
 
-    for (const service of SERVICES) {
-      const serviceCompanies =
-        companies.filter((company) =>
-          matchesService(company, service)
-        );
+        해당 지역에서 해당 서비스를
+        제공하는 업체가 있을 때만
+        사이트맵에 추가
+      */
 
-      if (
-        serviceCompanies.length === 0
+      for (
+        const district of
+        getDistricts(region)
       ) {
-        continue;
-      }
-
-      for (const province of PROVINCES) {
-        for (const district of province.districts) {
-          const districtCompanies =
-            serviceCompanies.filter((company) =>
-              matchesDistrict(
+        const hasCompany =
+          serviceCompanies.some(
+            (company) =>
+              matchesRegion(
                 company,
-                province,
+                region,
                 district
               )
-            );
+          );
 
-          if (
-            districtCompanies.length === 0
-          ) {
-            continue;
-          }
-
-          /*
-            기존 /seoul/[gu]/cooktop 페이지와
-            중복 사이트맵 등록 방지
-          */
-          const isExistingSeoulCooktop =
-            service.slug === "cooktop" &&
-            province.slug === "seoul";
-
-          /*
-            3. 시·군·구 주소
-          */
-          if (!isExistingSeoulCooktop) {
-            paths.add(
-              makeLocationPath(
-                service.slug,
-                province.slug,
-                district
-              )
-            );
-          }
-
-          /*
-            4. 업체가 등록한 읍·면·동 주소
-
-            기존 서울 쿡탑 페이지와의
-            중복을 피하기 위해 해당 조합은
-            이번 사이트맵에서 제외합니다.
-          */
-          if (isExistingSeoulCooktop) {
-            continue;
-          }
-
-          for (const company of districtCompanies) {
-            const neighborhoods =
-              getRegisteredNeighborhoods(
-                company,
-                province,
-                district
-              );
-
-            for (const neighborhood of neighborhoods) {
-              paths.add(
-                makeLocationPath(
-                  service.slug,
-                  province.slug,
-                  district,
-                  neighborhood
-                )
-              );
-            }
-          }
+        if (!hasCompany) {
+          continue;
         }
+
+        urls.add(
+          makeUrl(
+            service.slug,
+            [
+              region.slug,
+              district.slug,
+            ]
+          )
+        );
       }
     }
-  } catch (error) {
-    /*
-      업체 조회가 일시적으로 실패해도
-      기존 서비스·시도 주소는 유지
-    */
-    console.error(
-      "서비스 사이트맵 생성 오류:",
-      error
-    );
   }
-
-  const urls = [...paths].map((path) => {
-    const url = escapeXml(
-      `${SITE_URL}${path}`
-    );
-
-    return [
-      "  <url>",
-      `    <loc>${url}</loc>`,
-      "  </url>",
-    ].join("\n");
-  });
 
   const xml = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    ...urls,
+    ...[...urls].map(
+      (url) =>
+        `  <url><loc>${escapeXml(
+          url
+        )}</loc></url>`
+    ),
     "</urlset>",
   ].join("\n");
 
-  return new Response(xml, {
+  return new NextResponse(xml, {
     status: 200,
     headers: {
       "Content-Type":
         "application/xml; charset=utf-8",
       "Cache-Control":
-        "public, max-age=3600",
+        "public, s-maxage=3600, stale-while-revalidate=3600",
     },
   });
 }
