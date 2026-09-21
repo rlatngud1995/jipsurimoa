@@ -515,7 +515,7 @@ const serviceImages: Record<string, string> = {
 
   "욕실 수리": "/IMG_3510.jpeg",
 
-  "전기·조명": "/IMG_4289.jpeg",
+  "전기·조명": "/IMG_4290.jpeg",
 
   "에어컨": "/IMG_2756.jpeg",
 
