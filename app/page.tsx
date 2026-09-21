@@ -17,15 +17,10 @@ import type { Company } from "./data";
 import Footer from "./Footer";
 
 /* =====================================
-   이지종합건설 기존 설정
+   기본 설정
 ===================================== */
 
-const EASY_HOMECARE_IMAGE =
-  "/IMG_0778.png";
-
-/* =====================================
-   Supabase 연결
-===================================== */
+const EASY_HOMECARE_IMAGE = "/IMG_0778.png";
 
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -34,6 +29,40 @@ const SUPABASE_URL =
 
 const SUPABASE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+
+/* =====================================
+   서울 25개 구
+
+   기존에 만든 구별 쿡탑 페이지로 연결
+===================================== */
+
+const SEOUL_DISTRICTS = [
+  { slug: "gangnam-gu", name: "강남구" },
+  { slug: "gangdong-gu", name: "강동구" },
+  { slug: "gangbuk-gu", name: "강북구" },
+  { slug: "gangseo-gu", name: "강서구" },
+  { slug: "gwanak-gu", name: "관악구" },
+  { slug: "gwangjin-gu", name: "광진구" },
+  { slug: "guro-gu", name: "구로구" },
+  { slug: "geumcheon-gu", name: "금천구" },
+  { slug: "nowon-gu", name: "노원구" },
+  { slug: "dobong-gu", name: "도봉구" },
+  { slug: "dongdaemun-gu", name: "동대문구" },
+  { slug: "dongjak-gu", name: "동작구" },
+  { slug: "mapo-gu", name: "마포구" },
+  { slug: "seodaemun-gu", name: "서대문구" },
+  { slug: "seocho-gu", name: "서초구" },
+  { slug: "seongdong-gu", name: "성동구" },
+  { slug: "seongbuk-gu", name: "성북구" },
+  { slug: "songpa-gu", name: "송파구" },
+  { slug: "yangcheon-gu", name: "양천구" },
+  { slug: "yeongdeungpo-gu", name: "영등포구" },
+  { slug: "yongsan-gu", name: "용산구" },
+  { slug: "eunpyeong-gu", name: "은평구" },
+  { slug: "jongno-gu", name: "종로구" },
+  { slug: "jung-gu", name: "중구" },
+  { slug: "jungnang-gu", name: "중랑구" },
+] as const;
 
 /* =====================================
    업체 데이터 타입
@@ -81,7 +110,7 @@ function toCompany(
 }
 
 /* =====================================
-   이지종합건설 확인
+   업체별 대표 이미지
 ===================================== */
 
 function isEasyHomecare(
@@ -93,10 +122,6 @@ function isEasyHomecare(
   );
 }
 
-/* =====================================
-   업체별 대표 이미지
-===================================== */
-
 function getCompanyImage(
   company: CompanyWithWebsite
 ): string | null {
@@ -104,11 +129,9 @@ function getCompanyImage(
     return EASY_HOMECARE_IMAGE;
   }
 
-  if (company.images.length > 0) {
-    return company.images[0];
-  }
-
-  return null;
+  return company.images.length > 0
+    ? company.images[0]
+    : null;
 }
 
 /* =====================================
@@ -126,8 +149,6 @@ function normalizeKeyword(
 
 /* =====================================
    시공 종류별 이미지
-
-   기존 이미지 주소 그대로 유지
 ===================================== */
 
 const serviceImages: Record<string, string> = {
@@ -169,7 +190,7 @@ const serviceImages: Record<string, string> = {
 };
 
 /* =====================================
-   메인 홈페이지
+   홈페이지
 ===================================== */
 
 export default function Home() {
@@ -179,19 +200,13 @@ export default function Home() {
   const [region, setRegion] = useState("");
   const [service, setService] = useState("");
 
-  // 검색창 입력값
   const [keywordInput, setKeywordInput] =
     useState("");
 
-  // 실제 검색 결과에 적용된 키워드
   const [keyword, setKeyword] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  /* =====================================
-     인기 검색어 상태
-  ===================================== */
 
   const [popularKeywords, setPopularKeywords] =
     useState<PopularKeyword[]>([]);
@@ -201,6 +216,26 @@ export default function Home() {
 
   const [popularError, setPopularError] =
     useState("");
+
+  /* =====================================
+     서울 지역 선택 메뉴
+  ===================================== */
+
+  const [showSeoulDistricts, setShowSeoulDistricts] =
+    useState(false);
+
+  function openSeoulDistricts() {
+    setShowSeoulDistricts(true);
+
+    requestAnimationFrame(() => {
+      document
+        .getElementById("seoul-regions")
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+    });
+  }
 
   /* =====================================
      승인 업체 불러오기
@@ -262,7 +297,7 @@ export default function Home() {
   }, []);
 
   /* =====================================
-     인기 검색어 TOP 10 불러오기
+     인기 검색어 불러오기
   ===================================== */
 
   const loadPopularKeywords =
@@ -309,15 +344,13 @@ export default function Home() {
           );
         }
 
-        const validRows = (
-          rows as PopularKeyword[]
-        ).filter(
-          (item) =>
-            typeof item.keyword === "string" &&
-            typeof item.search_count === "number"
+        setPopularKeywords(
+          (rows as PopularKeyword[]).filter(
+            (item) =>
+              typeof item.keyword === "string" &&
+              typeof item.search_count === "number"
+          )
         );
-
-        setPopularKeywords(validRows);
       } catch (err) {
         setPopularError(
           err instanceof Error
@@ -336,16 +369,10 @@ export default function Home() {
   useEffect(() => {
     void loadCompanies();
     void loadPopularKeywords();
-  }, [
-    loadCompanies,
-    loadPopularKeywords,
-  ]);
+  }, [loadCompanies, loadPopularKeywords]);
 
   /* =====================================
      검색어 기록
-
-     검색 버튼을 누르거나 인기 검색어를
-     클릭했을 때만 기록합니다.
   ===================================== */
 
   const recordKeyword = useCallback(
@@ -386,7 +413,6 @@ export default function Home() {
 
         await loadPopularKeywords();
       } catch (err) {
-        // 기록 오류가 발생해도 업체 검색은 유지
         console.error(
           "검색어 기록 오류:",
           err
@@ -408,10 +434,6 @@ export default function Home() {
         block: "start",
       });
   }
-
-  /* =====================================
-     검색 실행
-  ===================================== */
 
   function runSearch(value: string) {
     const normalized =
@@ -480,7 +502,30 @@ export default function Home() {
           🏠 집수리모아
         </Link>
 
-        <nav>
+        <nav
+          style={{
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "12px",
+          }}
+        >
+          <button
+            type="button"
+            onClick={openSeoulDistricts}
+            style={{
+              padding: "8px 10px",
+              border: "1px solid #2563eb",
+              borderRadius: "8px",
+              background: "#eff6ff",
+              color: "#1d4ed8",
+              fontWeight: 800,
+              cursor: "pointer",
+            }}
+          >
+            📍 지역 선택
+          </button>
+
           <Link href="/companies">
             업체 찾기
           </Link>
@@ -514,7 +559,6 @@ export default function Home() {
             className="searchBox"
             onSubmit={(event) => {
               event.preventDefault();
-
               runSearch(keywordInput);
             }}
           >
@@ -578,11 +622,176 @@ export default function Home() {
               업체 검색하기
             </button>
           </form>
+
+          {/* 지역별 페이지 이동 버튼 */}
+
+          <button
+            type="button"
+            onClick={openSeoulDistricts}
+            style={{
+              display: "block",
+              width: "100%",
+              maxWidth: "520px",
+              margin: "22px auto 0",
+              padding: "16px 20px",
+              border: "2px solid #2563eb",
+              borderRadius: "14px",
+              background: "#ffffff",
+              color: "#1d4ed8",
+              fontSize: "17px",
+              fontWeight: 800,
+              cursor: "pointer",
+              boxShadow:
+                "0 5px 18px rgba(37, 99, 235, 0.10)",
+            }}
+          >
+            📍 서울 지역별 업체 찾기 →
+          </button>
         </div>
       </section>
 
       {/* =====================================
-         메인 인기 검색어 TOP 10
+         서울 25개 구 선택 메뉴
+      ===================================== */}
+
+      <section
+        id="seoul-regions"
+        className="section container"
+        style={{
+          scrollMarginTop: "20px",
+        }}
+      >
+        <div
+          style={{
+            padding: "24px",
+            border: "1px solid #bfdbfe",
+            borderRadius: "18px",
+            background: "#eff6ff",
+          }}
+        >
+          <h2
+            style={{
+              marginTop: 0,
+              color: "#1e40af",
+              fontSize: "24px",
+            }}
+          >
+            📍 서울 지역별 업체 찾기
+          </h2>
+
+          <p
+            style={{
+              color: "#475569",
+              lineHeight: 1.7,
+            }}
+          >
+            서울 전체 또는 원하는 구를 선택해
+            해당 지역의 쿡탑 설치·교체 업체를
+            확인하세요.
+          </p>
+
+          <button
+            type="button"
+            onClick={() =>
+              setShowSeoulDistricts(
+                (previous) => !previous
+              )
+            }
+            aria-expanded={showSeoulDistricts}
+            aria-controls="seoul-district-list"
+            style={{
+              width: "100%",
+              padding: "16px",
+              border: "none",
+              borderRadius: "12px",
+              background: "#2563eb",
+              color: "#ffffff",
+              fontSize: "17px",
+              fontWeight: 800,
+              cursor: "pointer",
+            }}
+          >
+            {showSeoulDistricts
+              ? "서울 25개 구 목록 닫기 ▲"
+              : "서울 25개 구 선택하기 ▼"}
+          </button>
+
+          {showSeoulDistricts && (
+            <div
+              id="seoul-district-list"
+              style={{
+                marginTop: "18px",
+              }}
+            >
+              <Link
+                href="/seoul/cooktop"
+                style={{
+                  display: "block",
+                  padding: "15px",
+                  marginBottom: "12px",
+                  borderRadius: "10px",
+                  background: "#1d4ed8",
+                  color: "#ffffff",
+                  textAlign: "center",
+                  textDecoration: "none",
+                  fontWeight: 800,
+                }}
+              >
+                서울 전체 쿡탑 설치·교체 업체 →
+              </Link>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit, minmax(min(100%, 130px), 1fr))",
+                  gap: "10px",
+                }}
+              >
+                {SEOUL_DISTRICTS.map(
+                  (district) => (
+                    <Link
+                      key={district.slug}
+                      href={`/seoul/${district.slug}/cooktop`}
+                      style={{
+                        display: "block",
+                        padding: "14px 10px",
+                        border: "1px solid #bfdbfe",
+                        borderRadius: "10px",
+                        background: "#ffffff",
+                        color: "#1d4ed8",
+                        textAlign: "center",
+                        textDecoration: "none",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {district.name} →
+                    </Link>
+                  )
+                )}
+              </div>
+
+              <p
+                style={{
+                  marginTop: "16px",
+                  marginBottom: 0,
+                  color: "#64748b",
+                  fontSize: "13px",
+                  lineHeight: 1.7,
+                }}
+              >
+                현재 지역별 바로가기는 기존에 만든
+                쿡탑 설치·교체 페이지로 연결됩니다.
+                동별 선택 메뉴는 실제 동 목록과
+                페이지 오류를 정리한 뒤 연결합니다.
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* =====================================
+         인기 검색어 TOP 10
       ===================================== */}
 
       <section className="section container">
@@ -690,7 +899,6 @@ export default function Home() {
                     onClick={() => {
                       setRegion("");
                       setService("");
-
                       runSearch(item.keyword);
                     }}
                     style={{
@@ -773,7 +981,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 시공 종류별 카테고리 */}
+      {/* =====================================
+         시공 종류별 카테고리
+      ===================================== */}
 
       <section className="section container">
         <div className="sectionTitle">
@@ -846,7 +1056,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 업체 검색 결과 */}
+      {/* =====================================
+         업체 검색 결과
+      ===================================== */}
 
       <section
         id="results"
@@ -906,8 +1118,6 @@ export default function Home() {
                     className="companyCard"
                     key={company.id}
                   >
-                    {/* 업체 대표사진 */}
-
                     <div className="companyImage">
                       {companyImage ? (
                         <img
@@ -931,8 +1141,6 @@ export default function Home() {
                         </span>
                       )}
                     </div>
-
-                    {/* 업체 정보 */}
 
                     <div className="companyContent">
                       <span className="companyBadge">
@@ -958,8 +1166,6 @@ export default function Home() {
                           {company.services.join(", ")}
                         </span>
                       </div>
-
-                      {/* 내부 홍보 페이지 및 전화 문의 */}
 
                       <div className="companyActions">
                         <Link
@@ -1027,8 +1233,6 @@ export default function Home() {
           </Link>
         </div>
       </section>
-
-      {/* 공통 하단 사업자 정보 */}
 
       <Footer />
     </main>
