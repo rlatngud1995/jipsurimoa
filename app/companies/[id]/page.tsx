@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import Footer from "../../Footer";
+import CompanyPromotion from "./CompanyPromotion";
 
 /* =====================================
    기본 설정
@@ -150,8 +151,6 @@ function getCompanyWebsite(
 
 /* =====================================
    승인된 업체 1곳 조회
-
-   승인 업체 목록에서 해당 ID만 조회합니다.
 ===================================== */
 
 async function getCompany(
@@ -226,6 +225,8 @@ export async function generateMetadata({
   const pageUrl =
     `${SITE_URL}/companies/${encodeURIComponent(company.id)}`;
 
+  const images = getCompanyImages(company);
+
   return {
     title: `${company.name} | 집수리모아 업체 소개`,
     description,
@@ -237,6 +238,19 @@ export async function generateMetadata({
       description,
       url: pageUrl,
       type: "website",
+      ...(images.length > 0
+        ? {
+            images: [
+              {
+                url: new URL(
+                  images[0],
+                  SITE_URL
+                ).toString(),
+                alt: `${company.name} 대표사진`,
+              },
+            ],
+          }
+        : {}),
     },
   };
 }
@@ -251,7 +265,6 @@ export default async function CompanyDetail({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-
   const company = await getCompany(id);
 
   if (!company) {
@@ -265,6 +278,9 @@ export default async function CompanyDetail({
     /[^\d+]/g,
     ""
   );
+
+  const pageUrl =
+    `${SITE_URL}/companies/${encodeURIComponent(company.id)}`;
 
   return (
     <main>
@@ -298,8 +314,65 @@ export default async function CompanyDetail({
             {company.description ||
               "업체의 시공 분야와 서비스 지역을 확인해 보세요."}
           </p>
+
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "10px",
+              marginTop: "20px",
+            }}
+          >
+            {phoneHref && (
+              <a
+                href={`tel:${phoneHref}`}
+                className="primaryButton"
+              >
+                📞 전화 문의하기
+              </a>
+            )}
+
+            <CompanyPromotion
+              companyName={company.name}
+              pageUrl={pageUrl}
+              variant="button"
+            />
+          </div>
         </div>
       </section>
+
+      {/* 업체 대표사진 */}
+
+      {images.length > 0 && (
+        <section
+          className="section container"
+          style={{
+            paddingBottom: "0",
+          }}
+        >
+          <div
+            style={{
+              maxWidth: "900px",
+              margin: "0 auto",
+              overflow: "hidden",
+              borderRadius: "18px",
+              background: "#f8fafc",
+              border: "1px solid #e5e7eb",
+            }}
+          >
+            <img
+              src={images[0]}
+              alt={`${company.name} 대표사진`}
+              style={{
+                display: "block",
+                width: "100%",
+                maxHeight: "420px",
+                objectFit: "contain",
+              }}
+            />
+          </div>
+        </section>
+      )}
 
       {/* 업체 기본 정보 */}
 
@@ -307,7 +380,11 @@ export default async function CompanyDetail({
         <div className="detailCard">
           <h2>업체 소개</h2>
 
-          <p>
+          <p
+            style={{
+              whiteSpace: "pre-line",
+            }}
+          >
             {company.description ||
               "업체 소개글이 아직 등록되지 않았습니다."}
           </p>
@@ -358,6 +435,12 @@ export default async function CompanyDetail({
                 🌐 업체 홈페이지 방문
               </a>
             )}
+
+            <CompanyPromotion
+              companyName={company.name}
+              pageUrl={pageUrl}
+              variant="button"
+            />
           </div>
         </div>
       </section>
@@ -369,21 +452,17 @@ export default async function CompanyDetail({
           <h2>시공사례 및 업체 사진</h2>
 
           <p>
-            업체가 등록한 사진을 확인해 보세요.
+            사진을 누르면 크게 볼 수 있습니다.
           </p>
         </div>
 
         {images.length > 0 ? (
-          <div className="photoGrid">
-            {images.map((image, index) => (
-              <img
-                key={`${image}-${index}`}
-                src={image}
-                alt={`${company.name} 등록 사진 ${index + 1}`}
-                loading="lazy"
-              />
-            ))}
-          </div>
+          <CompanyPromotion
+            companyName={company.name}
+            pageUrl={pageUrl}
+            images={images}
+            variant="gallery"
+          />
         ) : (
           <div className="emptyBox">
             아직 등록된 사진이 없습니다.
