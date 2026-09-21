@@ -1,19 +1,20 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 
-/* =====================================
+/* =========================================
    집수리모아 지역별 시공 업체 페이지
+
+   검색 제목 예시:
+   서울 쿡탑교체 | 집수리모아
+   안산 쿡탑교체 | 집수리모아
+   수원 싱크볼교체 | 집수리모아
+   천안 벌목 | 집수리모아
 
    파일:
    app/services/[service]/[[...location]]/page.tsx
-
-   주소 예시:
-   /services/cooktop
-   /services/cooktop/seoul
-   /services/cooktop/seoul/서초구
-   /services/cooktop/seoul/서초구/반포동
-===================================== */
+========================================= */
 
 const SITE_URL = "https://www.jipsurimoa.com";
 
@@ -28,7 +29,8 @@ const SUPABASE_KEY =
 
 type ServiceInfo = {
   slug: string;
-  title: string;
+  name: string;
+  searchKeyword: string;
   keywords: string[];
   description: string;
 };
@@ -57,56 +59,80 @@ type PageProps = {
   }>;
 };
 
+/* =========================================
+   카테고리별 검색 제목
+========================================= */
+
 const SERVICES: ServiceInfo[] = [
   {
     slug: "repair",
-    title: "종합 집수리",
+    name: "종합 집수리",
+    searchKeyword: "집수리",
     keywords: ["종합 집수리", "집수리"],
-    description: "주택 및 상가의 다양한 집수리 업체를 찾아보세요.",
+    description:
+      "주택 및 상가의 다양한 집수리 업체를 찾아보세요.",
   },
   {
     slug: "sink",
-    title: "싱크볼 리폼",
+    name: "싱크볼 리폼",
+    searchKeyword: "싱크볼교체",
     keywords: ["싱크볼", "싱크대"],
-    description: "싱크볼 설치·교체 및 주방 리폼 업체를 찾아보세요.",
+    description:
+      "싱크볼 설치·교체 및 주방 리폼 업체를 찾아보세요.",
   },
   {
     slug: "cooktop",
-    title: "쿡탑 설치·교체",
+    name: "쿡탑 설치·교체",
+    searchKeyword: "쿡탑교체",
     keywords: ["쿡탑", "인덕션", "가스레인지"],
-    description: "쿡탑과 인덕션 설치·교체 업체를 찾아보세요.",
+    description:
+      "쿡탑·인덕션·가스레인지 설치 및 교체 업체를 찾아보세요.",
   },
   {
     slug: "tree",
-    title: "벌목·조경",
+    name: "벌목·조경",
+    searchKeyword: "벌목",
     keywords: ["벌목", "조경", "나무 제거"],
-    description: "벌목, 위험목 제거 및 조경 업체를 찾아보세요.",
+    description:
+      "벌목, 위험목 제거 및 조경 업체를 찾아보세요.",
   },
   {
     slug: "aircon",
-    title: "에어컨",
+    name: "에어컨",
+    searchKeyword: "에어컨시공",
     keywords: ["에어컨"],
-    description: "에어컨 관련 시공 및 수리 업체를 찾아보세요.",
+    description:
+      "에어컨 관련 시공 및 수리 업체를 찾아보세요.",
   },
   {
     slug: "faucet",
-    title: "수전 교체",
+    name: "수전 교체",
+    searchKeyword: "수전교체",
     keywords: ["수전"],
-    description: "주방 및 욕실 수전 설치·교체 업체를 찾아보세요.",
+    description:
+      "주방 및 욕실 수전 설치·교체 업체를 찾아보세요.",
   },
   {
     slug: "petdoor",
-    title: "펫도어 설치",
+    name: "펫도어 설치",
+    searchKeyword: "펫도어설치",
     keywords: ["펫도어"],
-    description: "반려동물용 펫도어 설치 업체를 찾아보세요.",
+    description:
+      "반려동물용 펫도어 설치 업체를 찾아보세요.",
   },
   {
     slug: "refrigerator",
-    title: "냉장고 철거",
+    name: "냉장고 철거",
+    searchKeyword: "냉장고철거",
     keywords: ["냉장고 철거"],
-    description: "냉장고 및 냉장고장 철거 업체를 찾아보세요.",
+    description:
+      "냉장고 및 냉장고장 철거 업체를 찾아보세요.",
   },
 ];
+
+/* =========================================
+   전국 시·도 및 시·군·구
+========================================= */
 
 const PROVINCES: ProvinceInfo[] = [
   {
@@ -157,19 +183,25 @@ const PROVINCES: ProvinceInfo[] = [
     slug: "gwangju",
     name: "광주",
     aliases: ["광주광역시", "광주시", "광주"],
-    districts: ["광산구", "남구", "동구", "북구", "서구"],
+    districts: [
+      "광산구", "남구", "동구", "북구", "서구",
+    ],
   },
   {
     slug: "daejeon",
     name: "대전",
     aliases: ["대전광역시", "대전시", "대전"],
-    districts: ["대덕구", "동구", "서구", "유성구", "중구"],
+    districts: [
+      "대덕구", "동구", "서구", "유성구", "중구",
+    ],
   },
   {
     slug: "ulsan",
     name: "울산",
     aliases: ["울산광역시", "울산시", "울산"],
-    districts: ["남구", "동구", "북구", "울주군", "중구"],
+    districts: [
+      "남구", "동구", "북구", "울주군", "중구",
+    ],
   },
   {
     slug: "sejong",
@@ -195,7 +227,11 @@ const PROVINCES: ProvinceInfo[] = [
   {
     slug: "gangwon",
     name: "강원",
-    aliases: ["강원특별자치도", "강원도", "강원"],
+    aliases: [
+      "강원특별자치도",
+      "강원도",
+      "강원",
+    ],
     districts: [
       "강릉시", "고성군", "동해시", "삼척시",
       "속초시", "양구군", "양양군", "영월군",
@@ -228,7 +264,11 @@ const PROVINCES: ProvinceInfo[] = [
   {
     slug: "jeonbuk",
     name: "전북",
-    aliases: ["전북특별자치도", "전라북도", "전북"],
+    aliases: [
+      "전북특별자치도",
+      "전라북도",
+      "전북",
+    ],
     districts: [
       "고창군", "군산시", "김제시", "남원시",
       "무주군", "부안군", "순창군", "완주군",
@@ -277,32 +317,36 @@ const PROVINCES: ProvinceInfo[] = [
   {
     slug: "jeju",
     name: "제주",
-    aliases: ["제주특별자치도", "제주도", "제주"],
+    aliases: [
+      "제주특별자치도",
+      "제주도",
+      "제주",
+    ],
     districts: ["서귀포시", "제주시"],
   },
 ];
 
-/* =====================================
-   주소 및 지역 처리
-===================================== */
+/* =========================================
+   기본 함수
+========================================= */
 
 function compact(value: string): string {
   return value.replace(/\s+/g, "").trim();
 }
 
-function getLocation(
+function decodeLocation(
   location: string[] = []
 ): string[] {
-  return location.map((item) => {
+  return location.map((value) => {
     try {
-      return decodeURIComponent(item);
+      return decodeURIComponent(value);
     } catch {
-      return item;
+      return value;
     }
   });
 }
 
-function getPagePath(
+function pagePath(
   serviceSlug: string,
   location: string[] = []
 ): string {
@@ -310,9 +354,104 @@ function getPagePath(
     "",
     "services",
     serviceSlug,
-    ...location.map((item) => encodeURIComponent(item)),
+    ...location.map((value) =>
+      encodeURIComponent(value)
+    ),
   ].join("/");
 }
+
+/* =========================================
+   검색 제목 생성
+
+   서울 → 서울 쿡탑교체
+   안산시 → 안산 쿡탑교체
+   안산시 고잔동 → 안산 고잔동 쿡탑교체
+
+   중구·강서구처럼 같은 구 이름이
+   여러 시·도에 있으면 시·도명 포함
+========================================= */
+
+function shortDistrictName(
+  district: string
+): string {
+  if (
+    district.endsWith("시") ||
+    district.endsWith("군")
+  ) {
+    return district.slice(0, -1);
+  }
+
+  return district;
+}
+
+function searchAreaName(
+  province?: ProvinceInfo,
+  district?: string,
+  neighborhood?: string
+): string {
+  if (!province) return "";
+
+  if (!district) return province.name;
+
+  const duplicateDistrict =
+    PROVINCES.filter((item) =>
+      item.districts.includes(district)
+    ).length > 1;
+
+  const districtName =
+    shortDistrictName(district);
+
+  const prefix = duplicateDistrict
+    ? `${province.name} `
+    : "";
+
+  if (neighborhood) {
+    return `${prefix}${districtName} ${neighborhood}`;
+  }
+
+  return `${prefix}${districtName}`;
+}
+
+function searchTitle(
+  service: ServiceInfo,
+  province?: ProvinceInfo,
+  district?: string,
+  neighborhood?: string
+): string {
+  const area = searchAreaName(
+    province,
+    district,
+    neighborhood
+  );
+
+  return area
+    ? `${area} ${service.searchKeyword}`
+    : `${service.searchKeyword} 업체 찾기`;
+}
+
+/* =========================================
+   업체 서비스 일치 여부
+========================================= */
+
+function matchesService(
+  company: Company,
+  service: ServiceInfo
+): boolean {
+  return (company.services ?? []).some(
+    (registered) => {
+      const value = compact(registered);
+
+      return service.keywords.some(
+        (keyword) =>
+          value.includes(compact(keyword))
+      );
+    }
+  );
+}
+
+/* =========================================
+   업체 지역 일치 여부
+========================================= */
 
 function isNationwide(value: string): boolean {
   return [
@@ -331,7 +470,7 @@ function isCapitalArea(value: string): boolean {
   ].includes(compact(value));
 }
 
-function getProvinceRemainder(
+function provinceRemainder(
   registered: string,
   province: ProvinceInfo
 ): string | null {
@@ -339,7 +478,9 @@ function getProvinceRemainder(
 
   const alias = [...province.aliases]
     .sort((a, b) => b.length - a.length)
-    .find((name) => value.startsWith(compact(name)));
+    .find((name) =>
+      value.startsWith(compact(name))
+    );
 
   if (!alias) return null;
 
@@ -347,88 +488,100 @@ function getProvinceRemainder(
 }
 
 function isWholeArea(value: string): boolean {
-  return ["", "전체", "전지역", "전역"].includes(value);
-}
-
-function matchesService(
-  company: Company,
-  service: ServiceInfo
-): boolean {
-  return (company.services ?? []).some((registered) => {
-    const value = compact(registered);
-
-    return service.keywords.some((keyword) =>
-      value.includes(compact(keyword))
-    );
-  });
+  return [
+    "",
+    "전체",
+    "전지역",
+    "전역",
+  ].includes(value);
 }
 
 function matchesRegion(
   company: Company,
-  province: ProvinceInfo | undefined,
-  district: string | undefined,
-  neighborhood: string | undefined
+  province?: ProvinceInfo,
+  district?: string,
+  neighborhood?: string
 ): boolean {
   if (!province) return true;
 
-  return (company.regions ?? []).some((registered) => {
-    const value = compact(registered);
+  return (company.regions ?? []).some(
+    (registered) => {
+      const value = compact(registered);
 
-    if (isNationwide(value)) return true;
+      if (isNationwide(value)) {
+        return true;
+      }
 
-    if (
-      ["seoul", "gyeonggi", "incheon"].includes(
-        province.slug
-      ) &&
-      isCapitalArea(value)
-    ) {
-      return true;
+      if (
+        ["seoul", "gyeonggi", "incheon"].includes(
+          province.slug
+        ) &&
+        isCapitalArea(value)
+      ) {
+        return true;
+      }
+
+      const remainder = provinceRemainder(
+        registered,
+        province
+      );
+
+      if (remainder === null) {
+        return false;
+      }
+
+      if (isWholeArea(remainder)) {
+        return true;
+      }
+
+      if (!district) {
+        return true;
+      }
+
+      const districtValue =
+        compact(district);
+
+      if (
+        !remainder.startsWith(districtValue)
+      ) {
+        return false;
+      }
+
+      const afterDistrict =
+        remainder.slice(
+          districtValue.length
+        );
+
+      if (!neighborhood) {
+        return true;
+      }
+
+      if (isWholeArea(afterDistrict)) {
+        return true;
+      }
+
+      return (
+        afterDistrict ===
+        compact(neighborhood)
+      );
     }
-
-    const remainder = getProvinceRemainder(
-      registered,
-      province
-    );
-
-    if (remainder === null) return false;
-
-    // 시·도 전체 등록 업체는 해당 시·도 하위 지역에도 표시
-    if (isWholeArea(remainder)) return true;
-
-    // 시·도 페이지
-    if (!district) return true;
-
-    const districtValue = compact(district);
-
-    if (!remainder.startsWith(districtValue)) {
-      return false;
-    }
-
-    const afterDistrict = remainder.slice(
-      districtValue.length
-    );
-
-    // 시·군·구 페이지
-    if (!neighborhood) return true;
-
-    // 시·군·구 전체 등록 업체는 하위 읍·면·동에도 표시
-    if (isWholeArea(afterDistrict)) return true;
-
-    return afterDistrict === compact(neighborhood);
-  });
+  );
 }
 
-/* =====================================
+/* =========================================
    Supabase 승인 업체 조회
-===================================== */
+========================================= */
 
 async function loadCompanies(): Promise<Company[]> {
   if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.error("Supabase 환경변수가 없습니다.");
+    console.error(
+      "Supabase 환경변수가 설정되지 않았습니다."
+    );
+
     return [];
   }
 
-  const companies: Company[] = [];
+  const result: Company[] = [];
   const pageSize = 500;
   let offset = 0;
 
@@ -446,7 +599,8 @@ async function loadCompanies(): Promise<Company[]> {
         {
           headers: {
             apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
+            Authorization:
+              `Bearer ${SUPABASE_KEY}`,
           },
           cache: "no-store",
         }
@@ -454,30 +608,37 @@ async function loadCompanies(): Promise<Company[]> {
 
       if (!response.ok) {
         console.error(
-          "승인 업체 조회 실패:",
+          "업체 조회 실패:",
           response.status
         );
-        return companies;
+
+        return result;
       }
 
-      const rows = (await response.json()) as Company[];
+      const rows =
+        (await response.json()) as Company[];
 
-      companies.push(...rows);
+      result.push(...rows);
 
-      if (rows.length < pageSize) break;
+      if (rows.length < pageSize) {
+        break;
+      }
 
       offset += pageSize;
     }
   } catch (error) {
-    console.error("승인 업체 조회 오류:", error);
+    console.error(
+      "업체 조회 오류:",
+      error
+    );
   }
 
-  return companies;
+  return result;
 }
 
-/* =====================================
-   등록 업체의 읍·면·동 추출
-===================================== */
+/* =========================================
+   등록된 읍·면·동 추출
+========================================= */
 
 function getNeighborhoods(
   companies: Company[],
@@ -485,55 +646,69 @@ function getNeighborhoods(
   district: string
 ): string[] {
   const result = new Set<string>();
-  const districtValue = compact(district);
+  const districtValue =
+    compact(district);
 
   for (const company of companies) {
-    for (const registered of company.regions ?? []) {
-      const remainder = getProvinceRemainder(
-        registered,
-        province
-      );
+    for (
+      const registered of
+      company.regions ?? []
+    ) {
+      const remainder =
+        provinceRemainder(
+          registered,
+          province
+        );
 
       if (
         remainder === null ||
-        !remainder.startsWith(districtValue)
+        !remainder.startsWith(
+          districtValue
+        )
       ) {
         continue;
       }
 
-      const neighborhood = remainder.slice(
-        districtValue.length
-      );
+      const neighborhood =
+        remainder.slice(
+          districtValue.length
+        );
 
       if (
-        /^[가-힣0-9]+(?:동|읍|면)$/.test(neighborhood)
+        /^[가-힣0-9]+(?:동|읍|면)$/.test(
+          neighborhood
+        )
       ) {
         result.add(neighborhood);
       }
     }
   }
 
-  return [...result].sort((a, b) =>
-    a.localeCompare(b, "ko")
+  return [...result].sort(
+    (a, b) =>
+      a.localeCompare(b, "ko")
   );
 }
 
-/* =====================================
+/* =========================================
    페이지 정보
-===================================== */
+========================================= */
 
 function getPageInfo(
   serviceSlug: string,
   rawLocation: string[] = []
 ) {
   const service = SERVICES.find(
-    (item) => item.slug === serviceSlug
+    (item) =>
+      item.slug === serviceSlug
   );
 
-  const location = getLocation(rawLocation);
+  const location =
+    decodeLocation(rawLocation);
 
   const province = PROVINCES.find(
-    (item) => item.slug === location[0]
+    (item) =>
+      item.slug === location[0]
   );
 
   const district = location[1];
@@ -541,19 +716,26 @@ function getPageInfo(
 
   const validDistrict =
     !district ||
-    !!province?.districts.includes(district);
+    !!province?.districts.includes(
+      district
+    );
 
   const validNeighborhood =
     !neighborhood ||
     (
       !!district &&
-      /^[가-힣0-9]+(?:동|읍|면)$/.test(neighborhood)
+      /^[가-힣0-9]+(?:동|읍|면)$/.test(
+        neighborhood
+      )
     );
 
   const valid =
     !!service &&
     location.length <= 3 &&
-    (location.length === 0 || !!province) &&
+    (
+      location.length === 0 ||
+      !!province
+    ) &&
     validDistrict &&
     validNeighborhood;
 
@@ -566,7 +748,12 @@ function getPageInfo(
     .join(" ");
 
   const title = service
-    ? `${areaName ? `${areaName} ` : ""}${service.title} 업체 찾기`
+    ? searchTitle(
+        service,
+        province,
+        district,
+        neighborhood
+      )
     : "시공 업체 찾기";
 
   return {
@@ -575,15 +762,15 @@ function getPageInfo(
     province,
     district,
     neighborhood,
-    valid,
     areaName,
     title,
+    valid,
   };
 }
 
-/* =====================================
-   검색엔진 메타데이터
-===================================== */
+/* =========================================
+   네이버 검색 제목 및 설명
+========================================= */
 
 export async function generateMetadata({
   params,
@@ -597,7 +784,8 @@ export async function generateMetadata({
 
   if (!info.valid || !info.service) {
     return {
-      title: "페이지를 찾을 수 없습니다 | 집수리모아",
+      title:
+        "페이지를 찾을 수 없습니다 | 집수리모아",
       robots: {
         index: false,
         follow: false,
@@ -605,45 +793,75 @@ export async function generateMetadata({
     };
   }
 
-  const companies = await loadCompanies();
+  const service = info.service;
 
-  const matchedCompanies = companies.filter(
-    (company) =>
-      matchesService(company, info.service!) &&
-      matchesRegion(
-        company,
-        info.province,
-        info.district,
-        info.neighborhood
-      )
-  );
+  const companies =
+    await loadCompanies();
 
-  const canonical = `${SITE_URL}${getPagePath(
-    info.service.slug,
-    info.location
-  )}`;
+  const matchedCompanies =
+    companies.filter(
+      (company) =>
+        matchesService(
+          company,
+          service
+        ) &&
+        matchesRegion(
+          company,
+          info.province,
+          info.district,
+          info.neighborhood
+        )
+    );
+
+  const canonical =
+    `${SITE_URL}${pagePath(
+      service.slug,
+      info.location
+    )}`;
 
   /*
-    기존 서울 구별 쿡탑 페이지와 중복 방지:
-    /seoul/서초구/cooktop 주소를 대표 주소로 사용
+    기존 서울 구별 쿡탑 페이지와
+    중복 검색 주소 방지
   */
   const existingSeoulCooktop =
-    info.service.slug === "cooktop" &&
+    service.slug === "cooktop" &&
     info.province?.slug === "seoul" &&
     !!info.district;
 
-  const canonicalUrl = existingSeoulCooktop
-    ? `${SITE_URL}/seoul/${encodeURIComponent(
-        info.district!
-      )}/cooktop`
-    : canonical;
+  const canonicalUrl =
+    existingSeoulCooktop
+      ? `${SITE_URL}/seoul/${encodeURIComponent(
+          info.district!
+        )}/cooktop`
+      : canonical;
+
+  const description =
+    `${info.title} 업체를 집수리모아에서 찾아보세요. ` +
+    `${service.description} ` +
+    `시공 가능 지역과 업체 소개, 시공 사진 및 홈페이지를 확인할 수 있습니다.`;
 
   return {
-    title: `${info.title} | 집수리모아`,
-    description: `${info.title}. ${info.service.description} 등록된 업체의 시공 분야와 서비스 지역을 확인하고 업체 정보를 살펴보세요.`,
+    title: {
+      absolute:
+        `${info.title} | 집수리모아`,
+    },
+
+    description,
+
     alternates: {
       canonical: canonicalUrl,
     },
+
+    openGraph: {
+      title:
+        `${info.title} | 집수리모아`,
+      description,
+      url: canonicalUrl,
+      siteName: "집수리모아",
+      type: "website",
+      locale: "ko_KR",
+    },
+
     robots: {
       index:
         matchedCompanies.length > 0 &&
@@ -653,9 +871,9 @@ export async function generateMetadata({
   };
 }
 
-/* =====================================
+/* =========================================
    화면 스타일
-===================================== */
+========================================= */
 
 const styles = {
   page: {
@@ -699,9 +917,9 @@ const styles = {
   } as const,
 };
 
-/* =====================================
-   지역별 시공 업체 페이지
-===================================== */
+/* =========================================
+   실제 페이지 화면
+========================================= */
 
 export default async function ServiceLocationPage({
   params,
@@ -714,37 +932,33 @@ export default async function ServiceLocationPage({
   );
 
   if (!info.valid || !info.service) {
-    return (
-      <main style={styles.page}>
-        <div style={styles.container}>
-          <section style={styles.panel}>
-            <h1>페이지를 찾을 수 없습니다.</h1>
-            <p>시공 종류 또는 지역 주소를 확인해 주세요.</p>
-            <Link href="/" style={styles.link}>
-              집수리모아 홈으로
-            </Link>
-          </section>
-        </div>
-      </main>
-    );
+    notFound();
   }
 
   const service = info.service;
-  const companies = await loadCompanies();
 
-  const serviceCompanies = companies.filter(
-    (company) => matchesService(company, service)
-  );
+  const companies =
+    await loadCompanies();
 
-  const matchedCompanies = serviceCompanies.filter(
-    (company) =>
-      matchesRegion(
-        company,
-        info.province,
-        info.district,
-        info.neighborhood
-      )
-  );
+  const serviceCompanies =
+    companies.filter(
+      (company) =>
+        matchesService(
+          company,
+          service
+        )
+    );
+
+  const matchedCompanies =
+    serviceCompanies.filter(
+      (company) =>
+        matchesRegion(
+          company,
+          info.province,
+          info.district,
+          info.neighborhood
+        )
+    );
 
   const neighborhoodNames =
     info.province && info.district
@@ -755,16 +969,14 @@ export default async function ServiceLocationPage({
         )
       : [];
 
-  const currentPath = getPagePath(
-    service.slug,
-    info.location
-  );
-
   return (
     <main style={styles.page}>
       <div style={styles.container}>
         <header style={styles.panel}>
-          <Link href="/" style={styles.link}>
+          <Link
+            href="/"
+            style={styles.link}
+          >
             ← 집수리모아 홈
           </Link>
 
@@ -781,7 +993,8 @@ export default async function ServiceLocationPage({
 
           <h1
             style={{
-              fontSize: "clamp(26px, 5vw, 38px)",
+              fontSize:
+                "clamp(26px, 5vw, 38px)",
               lineHeight: 1.35,
               margin: "0 0 12px",
             }}
@@ -798,13 +1011,21 @@ export default async function ServiceLocationPage({
           >
             {service.description}
             {" "}
-            등록된 업체의 시공 분야와 서비스 지역을
-            확인하고 문의해 보세요.
+            등록 업체의 시공 분야,
+            서비스 지역 및 시공 사진을
+            확인해 보세요.
           </p>
         </header>
 
+        {/* 카테고리 선택 */}
+
         <section style={styles.panel}>
-          <h2 style={{ marginTop: 0, fontSize: 20 }}>
+          <h2
+            style={{
+              marginTop: 0,
+              fontSize: 20,
+            }}
+          >
             시공 종류 선택
           </h2>
 
@@ -818,30 +1039,39 @@ export default async function ServiceLocationPage({
             {SERVICES.map((item) => (
               <Link
                 key={item.slug}
-                href={getPagePath(
+                href={pagePath(
                   item.slug,
                   info.location
                 )}
                 style={{
                   ...styles.link,
                   background:
-                    item.slug === service.slug
+                    item.slug ===
+                    service.slug
                       ? "#eaf2ff"
                       : "#ffffff",
                   borderColor:
-                    item.slug === service.slug
+                    item.slug ===
+                    service.slug
                       ? "#8cb4f2"
                       : "#dce5f0",
                 }}
               >
-                {item.title}
+                {item.name}
               </Link>
             ))}
           </div>
         </section>
 
+        {/* 지역 선택 */}
+
         <section style={styles.panel}>
-          <h2 style={{ marginTop: 0, fontSize: 20 }}>
+          <h2
+            style={{
+              marginTop: 0,
+              fontSize: 20,
+            }}
+          >
             지역 선택
           </h2>
 
@@ -854,7 +1084,9 @@ export default async function ServiceLocationPage({
             }}
           >
             <Link
-              href={getPagePath(service.slug)}
+              href={pagePath(
+                service.slug
+              )}
               style={styles.link}
             >
               전국
@@ -862,26 +1094,31 @@ export default async function ServiceLocationPage({
 
             {info.province && (
               <Link
-                href={getPagePath(service.slug, [
-                  info.province.slug,
-                ])}
+                href={pagePath(
+                  service.slug,
+                  [info.province.slug]
+                )}
                 style={styles.link}
               >
                 {info.province.name}
               </Link>
             )}
 
-            {info.province && info.district && (
-              <Link
-                href={getPagePath(service.slug, [
-                  info.province.slug,
-                  info.district,
-                ])}
-                style={styles.link}
-              >
-                {info.district}
-              </Link>
-            )}
+            {info.province &&
+              info.district && (
+                <Link
+                  href={pagePath(
+                    service.slug,
+                    [
+                      info.province.slug,
+                      info.district,
+                    ]
+                  )}
+                  style={styles.link}
+                >
+                  {info.district}
+                </Link>
+              )}
 
             {info.neighborhood && (
               <span
@@ -903,64 +1140,79 @@ export default async function ServiceLocationPage({
                 gap: 9,
               }}
             >
-              {PROVINCES.map((province) => (
-                <Link
-                  key={province.slug}
-                  href={getPagePath(service.slug, [
-                    province.slug,
-                  ])}
-                  style={styles.link}
-                >
-                  {province.name}
-                </Link>
-              ))}
+              {PROVINCES.map(
+                (province) => (
+                  <Link
+                    key={province.slug}
+                    href={pagePath(
+                      service.slug,
+                      [province.slug]
+                    )}
+                    style={styles.link}
+                  >
+                    {province.name}
+                  </Link>
+                )
+              )}
             </div>
           )}
 
-          {info.province && !info.district && (
-            <>
-              <p style={{ color: "#586579" }}>
-                {info.province.name}의 시·군·구를 선택하세요.
-              </p>
+          {info.province &&
+            !info.district && (
+              <>
+                <p
+                  style={{
+                    color: "#586579",
+                  }}
+                >
+                  {info.province.name}의
+                  시·군·구를 선택하세요.
+                </p>
 
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 9,
-                }}
-              >
-                {info.province.districts.map(
-                  (district) => (
-                    <Link
-                      key={district}
-                      href={getPagePath(
-                        service.slug,
-                        [
-                          info.province!.slug,
-                          district,
-                        ]
-                      )}
-                      style={styles.link}
-                    >
-                      {district}
-                    </Link>
-                  )
-                )}
-              </div>
-            </>
-          )}
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 9,
+                  }}
+                >
+                  {info.province.districts.map(
+                    (district) => (
+                      <Link
+                        key={district}
+                        href={pagePath(
+                          service.slug,
+                          [
+                            info.province!
+                              .slug,
+                            district,
+                          ]
+                        )}
+                        style={styles.link}
+                      >
+                        {district}
+                      </Link>
+                    )
+                  )}
+                </div>
+              </>
+            )}
 
           {info.province &&
             info.district &&
             !info.neighborhood && (
               <>
-                <p style={{ color: "#586579" }}>
-                  등록 업체가 지역 정보에 명시한
-                  읍·면·동을 선택할 수 있습니다.
+                <p
+                  style={{
+                    color: "#586579",
+                  }}
+                >
+                  등록된 읍·면·동을
+                  선택하세요.
                 </p>
 
-                {neighborhoodNames.length > 0 ? (
+                {neighborhoodNames.length >
+                0 ? (
                   <div
                     style={{
                       display: "flex",
@@ -972,15 +1224,18 @@ export default async function ServiceLocationPage({
                       (neighborhood) => (
                         <Link
                           key={neighborhood}
-                          href={getPagePath(
+                          href={pagePath(
                             service.slug,
                             [
-                              info.province!.slug,
+                              info.province!
+                                .slug,
                               info.district!,
                               neighborhood,
                             ]
                           )}
-                          style={styles.link}
+                          style={
+                            styles.link
+                          }
                         >
                           {neighborhood}
                         </Link>
@@ -988,15 +1243,21 @@ export default async function ServiceLocationPage({
                     )}
                   </div>
                 ) : (
-                  <p style={{ color: "#586579" }}>
-                    현재 별도로 등록된 읍·면·동
-                    정보가 없습니다. 아래에서
-                    해당 시·군·구의 업체를 확인하세요.
+                  <p
+                    style={{
+                      color: "#586579",
+                    }}
+                  >
+                    현재 별도로 등록된
+                    읍·면·동 정보가
+                    없습니다.
                   </p>
                 )}
               </>
             )}
         </section>
+
+        {/* 업체 목록 */}
 
         <section style={styles.panel}>
           <h2
@@ -1006,9 +1267,7 @@ export default async function ServiceLocationPage({
               fontSize: 22,
             }}
           >
-            {info.areaName
-              ? `${info.areaName} 등록 업체`
-              : "등록 업체"}
+            {info.title} 업체 목록
           </h2>
 
           <p
@@ -1017,10 +1276,13 @@ export default async function ServiceLocationPage({
               color: "#586579",
             }}
           >
-            {service.title} · {matchedCompanies.length}곳
+            조건에 맞는 등록 업체
+            {" "}
+            {matchedCompanies.length}곳
           </p>
 
-          {matchedCompanies.length === 0 ? (
+          {matchedCompanies.length ===
+          0 ? (
             <div
               style={{
                 padding: "30px 12px",
@@ -1030,21 +1292,34 @@ export default async function ServiceLocationPage({
                 borderRadius: 12,
               }}
             >
-              <p style={{ fontWeight: 700 }}>
-                현재 조건에 맞는 등록 업체가 없습니다.
+              <p
+                style={{
+                  fontWeight: 700,
+                }}
+              >
+                현재 조건에 맞는
+                등록 업체가 없습니다.
               </p>
+
               <p>
-                상위 지역을 선택하거나 다른 시공
-                종류를 확인해 주세요.
+                상위 지역이나 다른
+                시공 종류를 확인해
+                주세요.
               </p>
 
               <Link
                 href={
                   info.province
-                    ? getPagePath(service.slug, [
-                        info.province.slug,
-                      ])
-                    : getPagePath(service.slug)
+                    ? pagePath(
+                        service.slug,
+                        [
+                          info.province
+                            .slug,
+                        ]
+                      )
+                    : pagePath(
+                        service.slug
+                      )
                 }
                 style={styles.link}
               >
@@ -1061,120 +1336,160 @@ export default async function ServiceLocationPage({
                 marginTop: 20,
               }}
             >
-              {matchedCompanies.map((company) => {
-                const image = (company.images ?? []).find(
-                  (item) =>
-                    typeof item === "string" &&
-                    /^https?:\/\//i.test(item)
-                );
+              {matchedCompanies.map(
+                (company) => {
+                  const image = (
+                    company.images ?? []
+                  ).find(
+                    (item) =>
+                      typeof item ===
+                        "string" &&
+                      /^https?:\/\//i.test(
+                        item
+                      )
+                  );
 
-                const website =
-                  company.website_url &&
-                  /^https?:\/\//i.test(
-                    company.website_url
-                  )
-                    ? company.website_url
-                    : null;
+                  const website =
+                    company.website_url &&
+                    /^https?:\/\//i.test(
+                      company.website_url
+                    )
+                      ? company.website_url
+                      : null;
 
-                return (
-                  <article
-                    key={String(company.id)}
-                    style={styles.card}
-                  >
-                    {image && (
-                      <div
-                        style={{
-                          height: 190,
-                          overflow: "hidden",
-                          borderRadius: 12,
-                          marginBottom: 16,
-                          background: "#edf1f7",
-                        }}
-                      >
-                        {/* 외부 Supabase 이미지 호환 */}
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={image}
-                          alt={`${company.name ?? "시공 업체"} 대표 사진`}
+                  return (
+                    <article
+                      key={String(
+                        company.id
+                      )}
+                      style={styles.card}
+                    >
+                      {image && (
+                        <div
                           style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
+                            height: 190,
+                            overflow:
+                              "hidden",
+                            borderRadius:
+                              12,
+                            marginBottom:
+                              16,
+                            background:
+                              "#edf1f7",
                           }}
-                        />
-                      </div>
-                    )}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={image}
+                            alt={`${company.name ?? "시공 업체"} 대표 사진`}
+                            style={{
+                              width:
+                                "100%",
+                              height:
+                                "100%",
+                              objectFit:
+                                "cover",
+                            }}
+                          />
+                        </div>
+                      )}
 
-                    <h3
-                      style={{
-                        margin: "0 0 10px",
-                        fontSize: 21,
-                      }}
-                    >
-                      {company.name ?? "등록 업체"}
-                    </h3>
-
-                    <p
-                      style={{
-                        color: "#586579",
-                        lineHeight: 1.7,
-                        whiteSpace: "pre-line",
-                        overflowWrap: "anywhere",
-                      }}
-                    >
-                      {company.description ||
-                        "업체 소개가 등록되지 않았습니다."}
-                    </p>
-
-                    <p
-                      style={{
-                        color: "#586579",
-                        fontSize: 13,
-                        lineHeight: 1.7,
-                      }}
-                    >
-                      <strong>시공 분야</strong>
-                      <br />
-                      {(company.services ?? []).join(
-                        " · "
-                      ) || "미등록"}
-                    </p>
-
-                    <p
-                      style={{
-                        color: "#586579",
-                        fontSize: 13,
-                        lineHeight: 1.7,
-                      }}
-                    >
-                      <strong>서비스 지역</strong>
-                      <br />
-                      {(company.regions ?? []).join(
-                        " · "
-                      ) || "미등록"}
-                    </p>
-
-                    {website && (
-                      <a
-                        href={website}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <h3
                         style={{
-                          ...styles.link,
-                          display: "block",
-                          textAlign: "center",
-                          marginTop: 16,
-                          background: "#2563eb",
-                          color: "#ffffff",
-                          borderColor: "#2563eb",
+                          margin:
+                            "0 0 10px",
+                          fontSize: 21,
                         }}
                       >
-                        업체 홈페이지 바로가기 →
-                      </a>
-                    )}
-                  </article>
-                );
-              })}
+                        {company.name ??
+                          "등록 업체"}
+                      </h3>
+
+                      <p
+                        style={{
+                          color:
+                            "#586579",
+                          lineHeight:
+                            1.7,
+                          whiteSpace:
+                            "pre-line",
+                          overflowWrap:
+                            "anywhere",
+                        }}
+                      >
+                        {company.description ||
+                          "업체 소개가 등록되지 않았습니다."}
+                      </p>
+
+                      <p
+                        style={{
+                          color:
+                            "#586579",
+                          fontSize: 13,
+                          lineHeight:
+                            1.7,
+                        }}
+                      >
+                        <strong>
+                          시공 분야
+                        </strong>
+                        <br />
+                        {(
+                          company.services ??
+                          []
+                        ).join(" · ") ||
+                          "미등록"}
+                      </p>
+
+                      <p
+                        style={{
+                          color:
+                            "#586579",
+                          fontSize: 13,
+                          lineHeight:
+                            1.7,
+                        }}
+                      >
+                        <strong>
+                          서비스 지역
+                        </strong>
+                        <br />
+                        {(
+                          company.regions ??
+                          []
+                        ).join(" · ") ||
+                          "미등록"}
+                      </p>
+
+                      {website && (
+                        <a
+                          href={website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            ...styles.link,
+                            display:
+                              "block",
+                            textAlign:
+                              "center",
+                            marginTop:
+                              16,
+                            background:
+                              "#2563eb",
+                            color:
+                              "#ffffff",
+                            borderColor:
+                              "#2563eb",
+                          }}
+                        >
+                          업체 홈페이지
+                          바로가기 →
+                        </a>
+                      )}
+                    </article>
+                  );
+                }
+              )}
             </div>
           )}
         </section>
@@ -1182,17 +1497,15 @@ export default async function ServiceLocationPage({
         <footer
           style={{
             textAlign: "center",
-            color: "#748094",
-            fontSize: 13,
             paddingTop: 14,
           }}
         >
-          <Link href="/" style={styles.link}>
-            집수리모아 홈으로 돌아가기
+          <Link
+            href="/"
+            style={styles.link}
+          >
+            집수리모아 홈으로
           </Link>
-          <p style={{ marginTop: 18 }}>
-            현재 페이지: {currentPath}
-          </p>
         </footer>
       </div>
     </main>
