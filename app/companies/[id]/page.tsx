@@ -4,17 +4,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import Footer from "../../Footer";
+import CompanyPromotion from "./CompanyPromotion";
 
 /* =====================================
    기본 설정
 ===================================== */
 
-const SITE_URL = "https://www.jipsurimoa.com";
+const SITE_URL =
+  "https://www.jipsurimoa.com";
 
 const EASY_HOMECARE_URL =
   "https://easyhomecare.vercel.app/";
 
-const EASY_HOMECARE_IMAGE = "/IMG_0778.png";
+const EASY_HOMECARE_IMAGE =
+  "/IMG_0778.png";
 
 /* =====================================
    Supabase 연결
@@ -57,29 +60,36 @@ type Company = {
 };
 
 /* =====================================
-   데이터 정리
+   업체 데이터 정리
 ===================================== */
 
-function toCompany(row: CompanyRow): Company {
+function toCompany(
+  row: CompanyRow
+): Company {
   return {
     id: row.id,
     name: row.name ?? "",
-    description: row.description ?? "",
+    description:
+      row.description ?? "",
     phone: row.phone ?? "",
-    regions: Array.isArray(row.regions)
-      ? row.regions
-      : [],
-    services: Array.isArray(row.services)
-      ? row.services
-      : [],
-    images: Array.isArray(row.images)
-      ? row.images.filter(
-          (image): image is string =>
-            typeof image === "string" &&
-            image.trim().length > 0
-        )
-      : [],
-    website_url: row.website_url ?? null,
+    regions:
+      Array.isArray(row.regions)
+        ? row.regions
+        : [],
+    services:
+      Array.isArray(row.services)
+        ? row.services
+        : [],
+    images:
+      Array.isArray(row.images)
+        ? row.images.filter(
+            (image): image is string =>
+              typeof image === "string" &&
+              image.trim().length > 0
+          )
+        : [],
+    website_url:
+      row.website_url ?? null,
   };
 }
 
@@ -91,7 +101,9 @@ function isEasyHomecare(
   company: Company
 ): boolean {
   return (
-    company.name.replace(/\s+/g, "").trim() ===
+    company.name
+      .replace(/\s+/g, "")
+      .trim() ===
     "이지종합건설"
   );
 }
@@ -124,7 +136,9 @@ function getSafeWebsiteUrl(
   }
 
   try {
-    const url = new URL(value.trim());
+    const url = new URL(
+      value.trim()
+    );
 
     if (
       !["https:", "http:"].includes(
@@ -178,12 +192,13 @@ async function getCompany(
     );
   }
 
-  const query = new URLSearchParams({
-    select:
-      "id,name,description,phone,regions,services,images,website_url",
-    id: `eq.${id}`,
-    limit: "1",
-  });
+  const query =
+    new URLSearchParams({
+      select:
+        "id,name,description,phone,regions,services,images,website_url",
+      id: `eq.${id}`,
+      limit: "1",
+    });
 
   const response = await fetch(
     `${SUPABASE_URL}/rest/v1/approved_companies?${query.toString()}`,
@@ -224,10 +239,14 @@ async function getCompany(
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{
+    id: string;
+  }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const company = await getCompany(id);
+
+  const company =
+    await getCompany(id);
 
   if (!company) {
     return {
@@ -290,10 +309,14 @@ export async function generateMetadata({
 export default async function CompanyDetail({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{
+    id: string;
+  }>;
 }) {
   const { id } = await params;
-  const company = await getCompany(id);
+
+  const company =
+    await getCompany(id);
 
   if (!company) {
     notFound();
@@ -360,34 +383,16 @@ export default async function CompanyDetail({
               "업체의 시공 분야와 서비스 지역을 확인해 보세요."}
           </p>
 
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "12px",
-              marginTop: "22px",
-            }}
-          >
-            {phoneHref && (
-              <a
-                href={`tel:${phoneHref}`}
-                className="primaryButton"
-              >
-                📞 전화 문의하기
-              </a>
-            )}
-
-            <a
-              href={`mailto:?subject=${encodeURIComponent(
-                `${company.name} 업체 소개`
-              )}&body=${encodeURIComponent(
-                `${company.name} 업체 홍보 페이지\n${pageUrl}`
-              )}`}
-              className="outlineButton"
-            >
-              🔗 업체 홍보 링크 공유
-            </a>
-          </div>
+          <CompanyPromotion
+            companyId={company.id}
+            companyName={company.name}
+            pageUrl={pageUrl}
+            phone={company.phone}
+            phoneHref={phoneHref}
+            website={website}
+            images={images}
+            variant="hero"
+          />
         </div>
       </section>
 
@@ -473,39 +478,20 @@ export default async function CompanyDetail({
               : "업체에 문의해 주세요."}
           </p>
 
-          {/* 고객 문의 버튼 */}
+          {/* 고객 문의 및 홍보 버튼 */}
 
-          <div
-            className="companyActions"
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "12px",
-              marginTop: "24px",
-            }}
-          >
-            {phoneHref && (
-              <a
-                href={`tel:${phoneHref}`}
-                className="primaryButton"
-              >
-                📞 {company.phone} 전화 문의
-              </a>
-            )}
+          <CompanyPromotion
+            companyId={company.id}
+            companyName={company.name}
+            pageUrl={pageUrl}
+            phone={company.phone}
+            phoneHref={phoneHref}
+            website={website}
+            images={images}
+            variant="actions"
+          />
 
-            {website && (
-              <a
-                href={website}
-                className="outlineButton"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                🌐 업체 홈페이지 방문
-              </a>
-            )}
-          </div>
-
-          {/* 홍보 주소 표시 */}
+          {/* 업체 홍보 주소 */}
 
           <div
             style={{
@@ -564,40 +550,16 @@ export default async function CompanyDetail({
         </div>
 
         {images.length > 0 ? (
-          <div className="photoGrid">
-            {images.map(
-              (image, index) => (
-                <a
-                  key={`${image}-${index}`}
-                  href={image}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`${company.name} 사진 ${
-                    index + 1
-                  } 크게 보기`}
-                  style={{
-                    display: "block",
-                    overflow: "hidden",
-                    borderRadius: "12px",
-                  }}
-                >
-                  <img
-                    src={image}
-                    alt={`${company.name} 등록 사진 ${
-                      index + 1
-                    }`}
-                    loading="lazy"
-                    style={{
-                      display: "block",
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
-                  />
-                </a>
-              )
-            )}
-          </div>
+          <CompanyPromotion
+            companyId={company.id}
+            companyName={company.name}
+            pageUrl={pageUrl}
+            phone={company.phone}
+            phoneHref={phoneHref}
+            website={website}
+            images={images}
+            variant="gallery"
+          />
         ) : (
           <div className="emptyBox">
             아직 등록된 사진이 없습니다.
