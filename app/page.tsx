@@ -28,14 +28,28 @@ const SUPABASE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
 /* =====================================
+   메인 카테고리 → 시공 서브페이지 연결
+
+   기존에 만든 /services/[service] 페이지의
+   카테고리 주소와 연결한다.
+
+   아직 전용 페이지가 없는 항목은
+   기존 업체 검색 기능을 사용한다.
+===================================== */
+
+const SERVICE_PAGE_LINKS: Record<string, string> = {
+  "종합 집수리": "/services/repair",
+  "싱크볼 리폼": "/services/sink",
+  "쿡탑 설치": "/services/cooktop",
+  "벌목·조경": "/services/tree",
+  "에어컨": "/services/aircon",
+  "수전 교체": "/services/faucet",
+  "펫도어 설치": "/services/petdoor",
+  "냉장고 철거": "/services/refrigerator",
+};
+
+/* =====================================
    전국 시·도 / 시·군·구
-
-   시·도 이름: 화면에 표시할 이름
-   aliases: 업체 등록 지역과 비교할 이름
-   districts: 지역 선택창에 표시할 목록
-
-   세종은 시·군·구가 없는 단일 행정구역이므로
-   세종시 전체 선택으로 검색
 ===================================== */
 
 type Province = {
@@ -343,12 +357,6 @@ function isCapitalArea(
 
 /* =====================================
    지역 문자열을 시·도와 비교
-
-   예시:
-   서울 전 지역
-   서울특별시 서초구
-   경기 수원시
-   충남 천안시
 ===================================== */
 
 function regionStartsWithProvince(
@@ -417,17 +425,6 @@ function servesProvince(
 
 /* =====================================
    업체의 시·군·구 서비스 가능 여부
-
-   시·도 전체 등록 업체는 해당 지역의
-   모든 시·군·구 검색 결과에 표시
-
-   예:
-   "서울 전 지역" → 서초구, 강남구 등
-   "경기 전체" → 수원시, 성남시 등
-
-   시·군·구만 단독 등록한 업체는
-   다른 시·도 동명 지역에 잘못 표시되지 않도록
-   별도 처리
 ===================================== */
 
 function servesDistrict(
@@ -493,8 +490,6 @@ function servesDistrict(
       return true;
     }
 
-    // 예: 서울서초구반포동
-    // 예: 경기수원시장안구
     return remaining.startsWith(
       targetDistrict
     );
@@ -1528,6 +1523,13 @@ export default function Home() {
 
       {/* =====================================
          시공 종류별 카테고리
+
+         수정된 부분:
+         전용 서브페이지가 있는 카테고리는
+         Link로 이동한다.
+
+         아직 전용 페이지가 없는 카테고리는
+         기존 업체 검색 결과로 이동한다.
       ===================================== */}
 
       <section className="section container">
@@ -1542,62 +1544,88 @@ export default function Home() {
         </div>
 
         <div className="serviceGrid">
-          {services.map((item) => (
-            <button
-              type="button"
-              key={item}
-              className={
-                service === item
-                  ? "serviceCard selected"
-                  : "serviceCard"
-              }
-              onClick={() => {
-                setService(item);
-                scrollToResults();
-              }}
-              style={{
-                padding: 0,
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "flex-start",
-                background: "#ffffff",
-              }}
-            >
-              <div
-                style={{
-                  width: "100%",
-                  aspectRatio: "4 / 3",
-                  overflow: "hidden",
-                  background: "#eff6ff",
-                }}
-              >
-                <img
-                  src={serviceImages[item]}
-                  alt={`${item} 시공 예시`}
-                  loading="lazy"
+          {services.map((item) => {
+            const pageHref = SERVICE_PAGE_LINKS[item];
+
+            const cardContent = (
+              <>
+                <div
                   style={{
                     width: "100%",
-                    height: "100%",
-                    display: "block",
-                    objectFit: "cover",
+                    aspectRatio: "4 / 3",
+                    overflow: "hidden",
+                    background: "#eff6ff",
                   }}
-                />
-              </div>
+                >
+                  <img
+                    src={serviceImages[item]}
+                    alt={`${item} 시공 예시`}
+                    loading="lazy"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      display: "block",
+                      objectFit: "cover",
+                    }}
+                  />
+                </div>
 
-              <strong
-                style={{
-                  padding: "12px 5px",
-                  color: "#1e3a8a",
-                  fontSize: "13px",
-                  textAlign: "center",
-                  lineHeight: 1.4,
+                <strong
+                  style={{
+                    padding: "12px 5px",
+                    color: "#1e3a8a",
+                    fontSize: "13px",
+                    textAlign: "center",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {item}
+                </strong>
+              </>
+            );
+
+            const cardStyle = {
+              padding: 0,
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column" as const,
+              justifyContent: "flex-start",
+              background: "#ffffff",
+              textDecoration: "none",
+            };
+
+            if (pageHref) {
+              return (
+                <Link
+                  key={item}
+                  href={pageHref}
+                  className="serviceCard"
+                  style={cardStyle}
+                >
+                  {cardContent}
+                </Link>
+              );
+            }
+
+            return (
+              <button
+                type="button"
+                key={item}
+                className={
+                  service === item
+                    ? "serviceCard selected"
+                    : "serviceCard"
+                }
+                onClick={() => {
+                  setService(item);
+                  scrollToResults();
                 }}
+                style={cardStyle}
               >
-                {item}
-              </strong>
-            </button>
-          ))}
+                {cardContent}
+              </button>
+            );
+          })}
         </div>
       </section>
 
