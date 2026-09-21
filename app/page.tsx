@@ -498,44 +498,34 @@ function servesDistrict(
 
 /* =====================================
    시공 종류별 이미지
+
+   public 폴더에 업로드한 실제 시공 사진
 ===================================== */
 
 const serviceImages: Record<string, string> = {
-  "종합 집수리":
-    "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=600&auto=format&fit=crop&q=80",
+  "종합 집수리": "/IMG_4313.jpeg",
 
-  "싱크볼 리폼":
-    "https://images.unsplash.com/photo-1556911220-bff31c812dba?w=600&auto=format&fit=crop&q=80",
+  "싱크볼 리폼": "/IMG_1096.jpeg",
 
-  "쿡탑 설치":
-    "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&auto=format&fit=crop&q=80",
+  "쿡탑 설치": "/IMG_2972.jpeg",
 
-  "철거·원상복구":
-    "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=600&auto=format&fit=crop&q=80",
+  "철거·원상복구": "/IMG_3095.jpeg",
 
-  "벌목·조경":
-    "https://images.unsplash.com/photo-1448375240586-882707db888b?w=600&auto=format&fit=crop&q=80",
+  "벌목·조경": "/IMG_4137.jpeg",
 
-  "욕실 수리":
-    "https://images.unsplash.com/photo-1620626011761-996317b8d101?w=600&auto=format&fit=crop&q=80",
+  "욕실 수리": "/IMG_3510.jpeg",
 
-  "전기·조명":
-    "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=600&auto=format&fit=crop&q=80",
+  "전기·조명": "/IMG_4289.jpeg",
 
-  "에어컨":
-    "https://images.unsplash.com/photo-1581092918056-0c4c3acd3789?w=600&auto=format&fit=crop&q=80",
+  "에어컨": "/IMG_2756.jpeg",
 
-  "수전 교체":
-    "https://images.unsplash.com/photo-1556912172-45b7abe8b7e1?w=600&auto=format&fit=crop&q=80",
+  "수전 교체": "/IMG_3424.jpeg",
 
-  "펫도어 설치":
-    "https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=600&auto=format&fit=crop&q=80",
+  "펫도어 설치": "/IMG_4313.jpeg",
 
-  "냉장고 철거":
-    "https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?w=600&auto=format&fit=crop&q=80",
+  "냉장고 철거": "/IMG_3095.jpeg",
 
-  "기타 시공":
-    "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?w=600&auto=format&fit=crop&q=80",
+  "기타 시공": "/IMG_3216.jpeg",
 };
 
 /* =====================================
@@ -1524,7 +1514,6 @@ export default function Home() {
       {/* =====================================
          시공 종류별 카테고리
 
-         수정된 부분:
          전용 서브페이지가 있는 카테고리는
          Link로 이동한다.
 
