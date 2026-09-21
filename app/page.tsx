@@ -28,127 +28,200 @@ const SUPABASE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
 /* =====================================
-   전국 시·도
+   전국 시·도 / 시·군·구
 
-   두 번째 선택창의 시·군·구는
-   등록 업체의 활동 지역을 기준으로 표시
+   시·도 이름: 화면에 표시할 이름
+   aliases: 업체 등록 지역과 비교할 이름
+   districts: 지역 선택창에 표시할 목록
+
+   세종은 시·군·구가 없는 단일 행정구역이므로
+   세종시 전체 선택으로 검색
 ===================================== */
 
-const PROVINCES = [
+type Province = {
+  name: string;
+  aliases: string[];
+  districts: string[];
+};
+
+const PROVINCES: Province[] = [
   {
     name: "서울특별시",
-    short: "서울",
-    aliases: ["서울", "서울시", "서울특별시"],
+    aliases: ["서울특별시", "서울시", "서울"],
+    districts: [
+      "강남구", "강동구", "강북구", "강서구",
+      "관악구", "광진구", "구로구", "금천구",
+      "노원구", "도봉구", "동대문구", "동작구",
+      "마포구", "서대문구", "서초구", "성동구",
+      "성북구", "송파구", "양천구", "영등포구",
+      "용산구", "은평구", "종로구", "중구",
+      "중랑구",
+    ],
   },
   {
     name: "부산광역시",
-    short: "부산",
-    aliases: ["부산", "부산시", "부산광역시"],
+    aliases: ["부산광역시", "부산시", "부산"],
+    districts: [
+      "강서구", "금정구", "기장군", "남구",
+      "동구", "동래구", "부산진구", "북구",
+      "사상구", "사하구", "서구", "수영구",
+      "연제구", "영도구", "중구", "해운대구",
+    ],
   },
   {
     name: "대구광역시",
-    short: "대구",
-    aliases: ["대구", "대구시", "대구광역시"],
+    aliases: ["대구광역시", "대구시", "대구"],
+    districts: [
+      "군위군", "남구", "달서구", "달성군",
+      "동구", "북구", "서구", "수성구", "중구",
+    ],
   },
   {
     name: "인천광역시",
-    short: "인천",
-    aliases: ["인천", "인천시", "인천광역시"],
+    aliases: ["인천광역시", "인천시", "인천"],
+    districts: [
+      "강화군", "계양구", "남동구", "동구",
+      "미추홀구", "부평구", "서구", "연수구",
+      "옹진군", "중구",
+    ],
   },
   {
     name: "광주광역시",
-    short: "광주",
-    aliases: ["광주", "광주시", "광주광역시"],
+    aliases: ["광주광역시", "광주광역", "광주"],
+    districts: [
+      "광산구", "남구", "동구", "북구", "서구",
+    ],
   },
   {
     name: "대전광역시",
-    short: "대전",
-    aliases: ["대전", "대전시", "대전광역시"],
+    aliases: ["대전광역시", "대전시", "대전"],
+    districts: [
+      "대덕구", "동구", "서구", "유성구", "중구",
+    ],
   },
   {
     name: "울산광역시",
-    short: "울산",
-    aliases: ["울산", "울산시", "울산광역시"],
+    aliases: ["울산광역시", "울산시", "울산"],
+    districts: [
+      "남구", "동구", "북구", "울주군", "중구",
+    ],
   },
   {
     name: "세종특별자치시",
-    short: "세종",
-    aliases: ["세종", "세종시", "세종특별자치시"],
+    aliases: [
+      "세종특별자치시",
+      "세종시",
+      "세종",
+    ],
+    districts: [],
   },
   {
     name: "경기도",
-    short: "경기",
-    aliases: ["경기", "경기도"],
+    aliases: ["경기도", "경기"],
+    districts: [
+      "가평군", "고양시", "과천시", "광명시",
+      "광주시", "구리시", "군포시", "김포시",
+      "남양주시", "동두천시", "부천시", "성남시",
+      "수원시", "시흥시", "안산시", "안성시",
+      "안양시", "양주시", "양평군", "여주시",
+      "연천군", "오산시", "용인시", "의왕시",
+      "의정부시", "이천시", "파주시", "평택시",
+      "포천시", "하남시", "화성시",
+    ],
   },
   {
     name: "강원특별자치도",
-    short: "강원",
-    aliases: ["강원", "강원도", "강원특별자치도"],
+    aliases: [
+      "강원특별자치도",
+      "강원도",
+      "강원",
+    ],
+    districts: [
+      "강릉시", "고성군", "동해시", "삼척시",
+      "속초시", "양구군", "양양군", "영월군",
+      "원주시", "인제군", "정선군", "철원군",
+      "춘천시", "태백시", "평창군", "홍천군",
+      "화천군", "횡성군",
+    ],
   },
   {
     name: "충청북도",
-    short: "충북",
-    aliases: ["충북", "충청북도"],
+    aliases: ["충청북도", "충북"],
+    districts: [
+      "괴산군", "단양군", "보은군", "영동군",
+      "옥천군", "음성군", "제천시", "증평군",
+      "진천군", "청주시", "충주시",
+    ],
   },
   {
     name: "충청남도",
-    short: "충남",
-    aliases: ["충남", "충청남도"],
+    aliases: ["충청남도", "충남"],
+    districts: [
+      "계룡시", "공주시", "금산군", "논산시",
+      "당진시", "보령시", "부여군", "서산시",
+      "서천군", "아산시", "예산군", "천안시",
+      "청양군", "태안군", "홍성군",
+    ],
   },
   {
     name: "전북특별자치도",
-    short: "전북",
-    aliases: ["전북", "전라북도", "전북특별자치도"],
+    aliases: [
+      "전북특별자치도",
+      "전라북도",
+      "전북",
+    ],
+    districts: [
+      "고창군", "군산시", "김제시", "남원시",
+      "무주군", "부안군", "순창군", "완주군",
+      "익산시", "임실군", "장수군", "전주시",
+      "정읍시", "진안군",
+    ],
   },
   {
     name: "전라남도",
-    short: "전남",
-    aliases: ["전남", "전라남도"],
+    aliases: ["전라남도", "전남"],
+    districts: [
+      "강진군", "고흥군", "곡성군", "광양시",
+      "구례군", "나주시", "담양군", "목포시",
+      "무안군", "보성군", "순천시", "신안군",
+      "여수시", "영광군", "영암군", "완도군",
+      "장성군", "장흥군", "진도군", "함평군",
+      "해남군", "화순군",
+    ],
   },
   {
     name: "경상북도",
-    short: "경북",
-    aliases: ["경북", "경상북도"],
+    aliases: ["경상북도", "경북"],
+    districts: [
+      "경산시", "경주시", "고령군", "구미시",
+      "김천시", "문경시", "봉화군", "상주시",
+      "성주군", "안동시", "영덕군", "영양군",
+      "영주시", "영천시", "예천군", "울릉군",
+      "울진군", "의성군", "청도군", "청송군",
+      "칠곡군", "포항시",
+    ],
   },
   {
     name: "경상남도",
-    short: "경남",
-    aliases: ["경남", "경상남도"],
+    aliases: ["경상남도", "경남"],
+    districts: [
+      "거제시", "거창군", "고성군", "김해시",
+      "남해군", "밀양시", "사천시", "산청군",
+      "양산시", "의령군", "진주시", "창녕군",
+      "창원시", "통영시", "하동군", "함안군",
+      "함양군", "합천군",
+    ],
   },
   {
     name: "제주특별자치도",
-    short: "제주",
-    aliases: ["제주", "제주도", "제주특별자치도"],
+    aliases: [
+      "제주특별자치도",
+      "제주도",
+      "제주",
+    ],
+    districts: ["서귀포시", "제주시"],
   },
-] as const;
-
-const SEOUL_DISTRICTS = [
-  "강남구",
-  "강동구",
-  "강북구",
-  "강서구",
-  "관악구",
-  "광진구",
-  "구로구",
-  "금천구",
-  "노원구",
-  "도봉구",
-  "동대문구",
-  "동작구",
-  "마포구",
-  "서대문구",
-  "서초구",
-  "성동구",
-  "성북구",
-  "송파구",
-  "양천구",
-  "영등포구",
-  "용산구",
-  "은평구",
-  "종로구",
-  "중구",
-  "중랑구",
-] as const;
+];
 
 /* =====================================
    업체 데이터 타입
@@ -196,7 +269,7 @@ function toCompany(
 }
 
 /* =====================================
-   이미지
+   업체 이미지
 ===================================== */
 
 function isEasyHomecare(
@@ -221,12 +294,8 @@ function getCompanyImage(
 }
 
 /* =====================================
-   지역명 처리
+   검색어 및 지역명 정리
 ===================================== */
-
-function compact(value: string): string {
-  return value.replace(/\s+/g, "").trim();
-}
 
 function normalizeKeyword(
   value: string
@@ -237,54 +306,66 @@ function normalizeKeyword(
     .toLowerCase();
 }
 
+function compact(
+  value: string
+): string {
+  return value.replace(/\s+/g, "").trim();
+}
+
 function getProvince(
   provinceName: string
-) {
+): Province | undefined {
   return PROVINCES.find(
     (item) => item.name === provinceName
   );
 }
 
-function hasProvinceName(
-  region: string,
-  provinceName: string
-): boolean {
-  const province = getProvince(provinceName);
-
-  if (!province) {
-    return false;
-  }
-
-  const value = compact(region);
-
-  return province.aliases.some(
-    (alias) => value.includes(alias)
-  );
-}
-
 function isNationwide(
-  region: string
+  value: string
 ): boolean {
-  const value = compact(region);
-
   return [
     "전국",
     "전국전체",
     "전국전지역",
     "전국시공",
-  ].includes(value);
+  ].includes(compact(value));
+}
+
+function isCapitalArea(
+  value: string
+): boolean {
+  return [
+    "수도권",
+    "수도권전체",
+    "수도권전지역",
+  ].includes(compact(value));
+}
+
+/* =====================================
+   지역 문자열을 시·도와 비교
+
+   예시:
+   서울 전 지역
+   서울특별시 서초구
+   경기 수원시
+   충남 천안시
+===================================== */
+
+function regionStartsWithProvince(
+  region: string,
+  province: Province
+): boolean {
+  const value = compact(region);
+
+  return province.aliases.some((alias) =>
+    value.startsWith(alias)
+  );
 }
 
 function isWholeProvince(
   region: string,
-  provinceName: string
+  province: Province
 ): boolean {
-  const province = getProvince(provinceName);
-
-  if (!province) {
-    return false;
-  }
-
   const value = compact(region);
 
   return province.aliases.some((alias) =>
@@ -297,140 +378,127 @@ function isWholeProvince(
   );
 }
 
+/* =====================================
+   업체의 시·도 서비스 가능 여부
+===================================== */
+
 function servesProvince(
   company: CompanyWithWebsite,
   provinceName: string
 ): boolean {
-  return company.regions.some(
-    (region) =>
-      isNationwide(region) ||
-      hasProvinceName(region, provinceName) ||
-      (
-        provinceName === "서울특별시" &&
-        ["수도권", "수도권전체", "수도권전지역"]
-          .includes(compact(region))
-      ) ||
-      (
-        provinceName === "경기도" &&
-        ["수도권", "수도권전체", "수도권전지역"]
-          .includes(compact(region))
-      ) ||
-      (
-        provinceName === "인천광역시" &&
-        ["수도권", "수도권전체", "수도권전지역"]
-          .includes(compact(region))
-      )
-  );
+  const province = getProvince(provinceName);
+
+  if (!province) {
+    return false;
+  }
+
+  return company.regions.some((region) => {
+    if (isNationwide(region)) {
+      return true;
+    }
+
+    if (
+      [
+        "서울특별시",
+        "경기도",
+        "인천광역시",
+      ].includes(provinceName) &&
+      isCapitalArea(region)
+    ) {
+      return true;
+    }
+
+    return regionStartsWithProvince(
+      region,
+      province
+    );
+  });
 }
+
+/* =====================================
+   업체의 시·군·구 서비스 가능 여부
+
+   시·도 전체 등록 업체는 해당 지역의
+   모든 시·군·구 검색 결과에 표시
+
+   예:
+   "서울 전 지역" → 서초구, 강남구 등
+   "경기 전체" → 수원시, 성남시 등
+
+   시·군·구만 단독 등록한 업체는
+   다른 시·도 동명 지역에 잘못 표시되지 않도록
+   별도 처리
+===================================== */
 
 function servesDistrict(
   company: CompanyWithWebsite,
   provinceName: string,
   districtName: string
 ): boolean {
-  if (!servesProvince(company, provinceName)) {
+  const province = getProvince(provinceName);
+
+  if (!province) {
     return false;
   }
 
-  const district = compact(districtName);
+  const targetDistrict = compact(districtName);
 
   return company.regions.some((region) => {
     const value = compact(region);
 
     if (
       isNationwide(region) ||
-      isWholeProvince(region, provinceName)
+      isWholeProvince(region, province)
     ) {
       return true;
     }
 
     if (
-      ["서울특별시", "경기도", "인천광역시"]
-        .includes(provinceName) &&
-      ["수도권", "수도권전체", "수도권전지역"]
-        .includes(value)
+      [
+        "서울특별시",
+        "경기도",
+        "인천광역시",
+      ].includes(provinceName) &&
+      isCapitalArea(region)
     ) {
       return true;
     }
 
-    if (!value.includes(district)) {
+    if (
+      !regionStartsWithProvince(
+        region,
+        province
+      )
+    ) {
       return false;
     }
 
-    // 다른 시·도가 명시된 지역은 제외
-    const otherProvince = PROVINCES.some(
-      (province) =>
-        province.name !== provinceName &&
-        province.aliases.some((alias) =>
-          value.startsWith(alias)
-        )
-    );
-
-    return !otherProvince;
-  });
-}
-
-/* =====================================
-   등록된 지역에서 시·군·구 추출
-
-   전국 행정구역 전체 데이터가 아니라
-   업체가 등록한 지역을 보여주는 방식
-===================================== */
-
-function extractDistricts(
-  companies: CompanyWithWebsite[],
-  provinceName: string
-): string[] {
-  const province = getProvince(provinceName);
-
-  if (!province) {
-    return [];
-  }
-
-  if (provinceName === "서울특별시") {
-    return [...SEOUL_DISTRICTS];
-  }
-
-  const found = new Set<string>();
-
-  for (const company of companies) {
-    for (const region of company.regions) {
-      if (!hasProvinceName(region, provinceName)) {
-        continue;
-      }
-
-      let value = compact(region);
-
-      const aliases = [...province.aliases]
-        .sort((a, b) => b.length - a.length);
-
-      for (const alias of aliases) {
-        if (value.startsWith(alias)) {
-          value = value.slice(alias.length);
-          break;
-        }
-      }
-
-      if (
-        !value ||
-        ["전체", "전지역", "전역"].includes(value)
-      ) {
-        continue;
-      }
-
-      const match = value.match(
-        /^(.+?(?:시|군|구))(?=$|.+)/
+    const matchedAlias = [
+      ...province.aliases,
+    ]
+      .sort((a, b) => b.length - a.length)
+      .find((alias) =>
+        value.startsWith(alias)
       );
 
-      if (match) {
-        found.add(match[1]);
-      }
+    if (!matchedAlias) {
+      return false;
     }
-  }
 
-  return [...found].sort(
-    (a, b) => a.localeCompare(b, "ko")
-  );
+    const remaining = value.slice(
+      matchedAlias.length
+    );
+
+    if (remaining === targetDistrict) {
+      return true;
+    }
+
+    // 예: 서울서초구반포동
+    // 예: 경기수원시장안구
+    return remaining.startsWith(
+      targetDistrict
+    );
+  });
 }
 
 /* =====================================
@@ -516,16 +584,19 @@ export default function Home() {
   const [showRegionFinder, setShowRegionFinder] =
     useState(false);
 
-  const availableDistricts = useMemo(
-    () =>
-      selectedProvince
-        ? extractDistricts(
-            companies,
-            selectedProvince
-          )
-        : [],
-    [companies, selectedProvince]
+  const currentProvince = useMemo(
+    () => getProvince(selectedProvince),
+    [selectedProvince]
   );
+
+  function scrollToResults() {
+    document
+      .getElementById("results")
+      ?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+  }
 
   function openRegionFinder() {
     setShowRegionFinder(true);
@@ -550,6 +621,13 @@ export default function Home() {
     setSelectedProvince("");
     setSelectedDistrict("");
     setRegion("");
+  }
+
+  function showRegionResults() {
+    setRegion("");
+    setKeyword("");
+    setKeywordInput("");
+    scrollToResults();
   }
 
   /* =====================================
@@ -633,7 +711,7 @@ export default function Home() {
   }, []);
 
   /* =====================================
-     인기 검색어 TOP 10
+     인기 검색어 불러오기
   ===================================== */
 
   const loadPopularKeywords =
@@ -751,17 +829,8 @@ export default function Home() {
   );
 
   /* =====================================
-     검색 및 이동
+     검색 실행
   ===================================== */
-
-  function scrollToResults() {
-    document
-      .getElementById("results")
-      ?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-  }
 
   function runSearch(value: string) {
     const normalized =
@@ -774,13 +843,6 @@ export default function Home() {
       void recordKeyword(normalized);
     }
 
-    scrollToResults();
-  }
-
-  function showRegionResults() {
-    setRegion("");
-    setKeyword("");
-    setKeywordInput("");
     scrollToResults();
   }
 
@@ -1061,7 +1123,7 @@ export default function Home() {
                   lineHeight: 1.7,
                 }}
               >
-                원하는 시·도와 시·군·구를
+                전국 시·도와 시·군·구를
                 선택해 보세요.
               </p>
             </div>
@@ -1162,7 +1224,11 @@ export default function Home() {
 
                   <select
                     value={selectedDistrict}
-                    disabled={!selectedProvince}
+                    disabled={
+                      !selectedProvince ||
+                      !currentProvince ||
+                      currentProvince.districts.length === 0
+                    }
                     onChange={(event) => {
                       setSelectedDistrict(
                         event.target.value
@@ -1174,20 +1240,25 @@ export default function Home() {
                       padding: "14px",
                       border: "1px solid #cbd5e1",
                       borderRadius: "11px",
-                      background: selectedProvince
-                        ? "#ffffff"
-                        : "#f1f5f9",
+                      background:
+                        selectedProvince &&
+                        currentProvince &&
+                        currentProvince.districts.length > 0
+                          ? "#ffffff"
+                          : "#f1f5f9",
                       color: "#0f172a",
                       fontSize: "15px",
                     }}
                   >
                     <option value="">
-                      {selectedProvince
-                        ? "시·군·구 전체"
-                        : "시·도를 먼저 선택"}
+                      {!selectedProvince
+                        ? "시·도를 먼저 선택"
+                        : currentProvince?.districts.length === 0
+                        ? "시·도 전체"
+                        : "시·군·구 전체"}
                     </option>
 
-                    {availableDistricts.map(
+                    {currentProvince?.districts.map(
                       (district) => (
                         <option
                           key={district}
@@ -1200,21 +1271,6 @@ export default function Home() {
                   </select>
                 </label>
               </div>
-
-              {selectedProvince &&
-                availableDistricts.length === 0 && (
-                  <p
-                    style={{
-                      color: "#64748b",
-                      fontSize: "13px",
-                      lineHeight: 1.7,
-                    }}
-                  >
-                    현재 등록 업체의 지역 정보에서
-                    선택 가능한 시·군·구가 없습니다.
-                    시·도 전체로 검색할 수 있습니다.
-                  </p>
-                )}
 
               <div
                 style={{
@@ -1241,7 +1297,7 @@ export default function Home() {
                   {selectedDistrict
                     ? `${selectedDistrict} 업체 보기 →`
                     : selectedProvince
-                    ? `${getProvince(selectedProvince)?.short ?? ""} 전체 업체 보기 →`
+                    ? `${selectedProvince} 전체 업체 보기 →`
                     : "전국 업체 보기 →"}
                 </button>
 
@@ -1271,9 +1327,9 @@ export default function Home() {
                   lineHeight: 1.7,
                 }}
               >
-                지역 선택 결과는 현재 등록된
-                업체의 활동 지역 정보를 기준으로
-                표시됩니다.
+                선택한 지역에서 작업하는
+                등록 업체를 보여줍니다.
+                업체가 없는 지역도 선택할 수 있습니다.
               </p>
             </div>
           )}
@@ -1697,7 +1753,7 @@ export default function Home() {
               <div className="emptyBox">
                 {companies.length === 0
                   ? "현재 공개된 업체가 없습니다. 업체 승인 후 이곳에 표시됩니다."
-                  : "검색 조건에 맞는 등록 업체가 없습니다."}
+                  : "선택한 지역과 검색 조건에 맞는 등록 업체가 없습니다."}
               </div>
             )}
           </>
