@@ -4,7 +4,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import Footer from "../../Footer";
-import CompanyPromotion from "./CompanyPromotion";
 
 /* =====================================
    기본 설정
@@ -23,11 +22,13 @@ const EASY_HOMECARE_IMAGE = "/IMG_0778.png";
 
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL
-    ?.replace(/\/rest\/v1\/?$/, "")
+    ?.trim()
+    .replace(/\/rest\/v1\/?$/, "")
     .replace(/\/$/, "") ?? "";
 
 const SUPABASE_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    ?.trim() ?? "";
 
 /* =====================================
    업체 데이터 타입
@@ -72,7 +73,11 @@ function toCompany(row: CompanyRow): Company {
       ? row.services
       : [],
     images: Array.isArray(row.images)
-      ? row.images
+      ? row.images.filter(
+          (image): image is string =>
+            typeof image === "string" &&
+            image.trim().length > 0
+        )
       : [],
     website_url: row.website_url ?? null,
   };
@@ -82,19 +87,24 @@ function toCompany(row: CompanyRow): Company {
    이지종합건설 기존 설정 유지
 ===================================== */
 
-function isEasyHomecare(company: Company): boolean {
+function isEasyHomecare(
+  company: Company
+): boolean {
   return (
     company.name.replace(/\s+/g, "").trim() ===
     "이지종합건설"
   );
 }
 
-function getCompanyImages(company: Company): string[] {
+function getCompanyImages(
+  company: Company
+): string[] {
   if (isEasyHomecare(company)) {
     return [
       EASY_HOMECARE_IMAGE,
       ...company.images.filter(
-        (image) => image !== EASY_HOMECARE_IMAGE
+        (image) =>
+          image !== EASY_HOMECARE_IMAGE
       ),
     ];
   }
@@ -117,7 +127,9 @@ function getSafeWebsiteUrl(
     const url = new URL(value.trim());
 
     if (
-      !["https:", "http:"].includes(url.protocol) ||
+      !["https:", "http:"].includes(
+        url.protocol
+      ) ||
       !url.hostname.includes(".") ||
       url.username ||
       url.password
@@ -134,9 +146,10 @@ function getSafeWebsiteUrl(
 function getCompanyWebsite(
   company: Company
 ): string | null {
-  const registeredWebsite = getSafeWebsiteUrl(
-    company.website_url
-  );
+  const registeredWebsite =
+    getSafeWebsiteUrl(
+      company.website_url
+    );
 
   if (registeredWebsite) {
     return registeredWebsite;
@@ -156,7 +169,10 @@ function getCompanyWebsite(
 async function getCompany(
   id: string
 ): Promise<Company | null> {
-  if (!SUPABASE_URL || !SUPABASE_KEY) {
+  if (
+    !SUPABASE_URL ||
+    !SUPABASE_KEY
+  ) {
     throw new Error(
       "Supabase 환경변수가 설정되지 않았습니다."
     );
@@ -175,7 +191,8 @@ async function getCompany(
       method: "GET",
       headers: {
         apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
+        Authorization:
+          `Bearer ${SUPABASE_KEY}`,
       },
       cache: "no-store",
     }
@@ -187,9 +204,13 @@ async function getCompany(
     );
   }
 
-  const rows: CompanyRow[] = await response.json();
+  const rows: CompanyRow[] =
+    await response.json();
 
-  if (!Array.isArray(rows) || rows.length === 0) {
+  if (
+    !Array.isArray(rows) ||
+    rows.length === 0
+  ) {
     return null;
   }
 
@@ -210,7 +231,8 @@ export async function generateMetadata({
 
   if (!company) {
     return {
-      title: "업체를 찾을 수 없습니다 | 집수리모아",
+      title:
+        "업체를 찾을 수 없습니다 | 집수리모아",
       robots: {
         index: false,
         follow: false,
@@ -223,18 +245,23 @@ export async function generateMetadata({
     `${company.name}의 시공 분야와 서비스 지역, 시공사진 및 문의 정보를 집수리모아에서 확인하세요.`;
 
   const pageUrl =
-    `${SITE_URL}/companies/${encodeURIComponent(company.id)}`;
+    `${SITE_URL}/companies/${encodeURIComponent(
+      company.id
+    )}`;
 
-  const images = getCompanyImages(company);
+  const images =
+    getCompanyImages(company);
 
   return {
-    title: `${company.name} | 집수리모아 업체 소개`,
+    title:
+      `${company.name} | 집수리모아 업체 소개`,
     description,
     alternates: {
       canonical: pageUrl,
     },
     openGraph: {
-      title: `${company.name} | 집수리모아`,
+      title:
+        `${company.name} | 집수리모아`,
       description,
       url: pageUrl,
       type: "website",
@@ -246,7 +273,8 @@ export async function generateMetadata({
                   images[0],
                   SITE_URL
                 ).toString(),
-                alt: `${company.name} 대표사진`,
+                alt:
+                  `${company.name} 대표사진`,
               },
             ],
           }
@@ -271,28 +299,41 @@ export default async function CompanyDetail({
     notFound();
   }
 
-  const website = getCompanyWebsite(company);
-  const images = getCompanyImages(company);
+  const website =
+    getCompanyWebsite(company);
 
-  const phoneHref = company.phone.replace(
-    /[^\d+]/g,
-    ""
-  );
+  const images =
+    getCompanyImages(company);
+
+  const phoneHref =
+    company.phone.replace(
+      /[^\d+]/g,
+      ""
+    );
 
   const pageUrl =
-    `${SITE_URL}/companies/${encodeURIComponent(company.id)}`;
+    `${SITE_URL}/companies/${encodeURIComponent(
+      company.id
+    )}`;
 
   return (
     <main>
-      {/* 상단 메뉴 */}
+      {/* =====================================
+         상단 메뉴
+      ===================================== */}
 
       <header className="header">
-        <Link href="/" className="logo">
+        <Link
+          href="/"
+          className="logo"
+        >
           🏠 집수리모아
         </Link>
 
         <nav>
-          <Link href="/">홈</Link>
+          <Link href="/">
+            홈
+          </Link>
 
           <Link href="/companies">
             업체 찾기
@@ -300,7 +341,9 @@ export default async function CompanyDetail({
         </nav>
       </header>
 
-      {/* 업체 대표 소개 */}
+      {/* =====================================
+         업체 대표 소개
+      ===================================== */}
 
       <section className="pageHero">
         <div className="container">
@@ -308,7 +351,9 @@ export default async function CompanyDetail({
             집수리모아 등록 업체
           </span>
 
-          <h1>{company.name}</h1>
+          <h1>
+            {company.name}
+          </h1>
 
           <p>
             {company.description ||
@@ -319,8 +364,8 @@ export default async function CompanyDetail({
             style={{
               display: "flex",
               flexWrap: "wrap",
-              gap: "10px",
-              marginTop: "20px",
+              gap: "12px",
+              marginTop: "22px",
             }}
           >
             {phoneHref && (
@@ -332,22 +377,29 @@ export default async function CompanyDetail({
               </a>
             )}
 
-            <CompanyPromotion
-              companyName={company.name}
-              pageUrl={pageUrl}
-              variant="button"
-            />
+            <a
+              href={`mailto:?subject=${encodeURIComponent(
+                `${company.name} 업체 소개`
+              )}&body=${encodeURIComponent(
+                `${company.name} 업체 홍보 페이지\n${pageUrl}`
+              )}`}
+              className="outlineButton"
+            >
+              🔗 업체 홍보 링크 공유
+            </a>
           </div>
         </div>
       </section>
 
-      {/* 업체 대표사진 */}
+      {/* =====================================
+         업체 대표사진
+      ===================================== */}
 
       {images.length > 0 && (
         <section
           className="section container"
           style={{
-            paddingBottom: "0",
+            paddingBottom: 0,
           }}
         >
           <div
@@ -356,29 +408,41 @@ export default async function CompanyDetail({
               margin: "0 auto",
               overflow: "hidden",
               borderRadius: "18px",
+              border:
+                "1px solid #e5e7eb",
               background: "#f8fafc",
-              border: "1px solid #e5e7eb",
             }}
           >
-            <img
-              src={images[0]}
-              alt={`${company.name} 대표사진`}
-              style={{
-                display: "block",
-                width: "100%",
-                maxHeight: "420px",
-                objectFit: "contain",
-              }}
-            />
+            <a
+              href={images[0]}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${company.name} 대표사진 크게 보기`}
+            >
+              <img
+                src={images[0]}
+                alt={`${company.name} 대표사진`}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  maxHeight: "420px",
+                  objectFit: "contain",
+                }}
+              />
+            </a>
           </div>
         </section>
       )}
 
-      {/* 업체 기본 정보 */}
+      {/* =====================================
+         업체 기본 정보
+      ===================================== */}
 
       <section className="section container">
         <div className="detailCard">
-          <h2>업체 소개</h2>
+          <h2>
+            업체 소개
+          </h2>
 
           <p
             style={{
@@ -389,7 +453,9 @@ export default async function CompanyDetail({
               "업체 소개글이 아직 등록되지 않았습니다."}
           </p>
 
-          <h3>서비스 지역</h3>
+          <h3>
+            서비스 지역
+          </h3>
 
           <p>
             {company.regions.length > 0
@@ -397,7 +463,9 @@ export default async function CompanyDetail({
               : "업체에 문의해 주세요."}
           </p>
 
-          <h3>전문 시공 분야</h3>
+          <h3>
+            전문 시공 분야
+          </h3>
 
           <p>
             {company.services.length > 0
@@ -435,21 +503,60 @@ export default async function CompanyDetail({
                 🌐 업체 홈페이지 방문
               </a>
             )}
+          </div>
 
-            <CompanyPromotion
-              companyName={company.name}
-              pageUrl={pageUrl}
-              variant="button"
-            />
+          {/* 홍보 주소 표시 */}
+
+          <div
+            style={{
+              marginTop: "28px",
+              padding: "16px",
+              borderRadius: "12px",
+              background: "#f8fafc",
+              border:
+                "1px solid #e5e7eb",
+            }}
+          >
+            <h3
+              style={{
+                marginTop: 0,
+              }}
+            >
+              🔗 업체 홍보 페이지 주소
+            </h3>
+
+            <p
+              style={{
+                overflowWrap: "anywhere",
+                fontSize: "14px",
+              }}
+            >
+              {pageUrl}
+            </p>
+
+            <p
+              className="formHint"
+              style={{
+                marginBottom: 0,
+              }}
+            >
+              이 주소를 복사해 블로그,
+              SNS, 고객 안내 메시지에
+              공유해 보세요.
+            </p>
           </div>
         </div>
       </section>
 
-      {/* 시공사진 */}
+      {/* =====================================
+         시공사진
+      ===================================== */}
 
       <section className="section container">
         <div className="sectionTitle">
-          <h2>시공사례 및 업체 사진</h2>
+          <h2>
+            시공사례 및 업체 사진
+          </h2>
 
           <p>
             사진을 누르면 크게 볼 수 있습니다.
@@ -457,12 +564,40 @@ export default async function CompanyDetail({
         </div>
 
         {images.length > 0 ? (
-          <CompanyPromotion
-            companyName={company.name}
-            pageUrl={pageUrl}
-            images={images}
-            variant="gallery"
-          />
+          <div className="photoGrid">
+            {images.map(
+              (image, index) => (
+                <a
+                  key={`${image}-${index}`}
+                  href={image}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`${company.name} 사진 ${
+                    index + 1
+                  } 크게 보기`}
+                  style={{
+                    display: "block",
+                    overflow: "hidden",
+                    borderRadius: "12px",
+                  }}
+                >
+                  <img
+                    src={image}
+                    alt={`${company.name} 등록 사진 ${
+                      index + 1
+                    }`}
+                    loading="lazy"
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
+                </a>
+              )
+            )}
+          </div>
         ) : (
           <div className="emptyBox">
             아직 등록된 사진이 없습니다.
@@ -470,7 +605,9 @@ export default async function CompanyDetail({
         )}
       </section>
 
-      {/* 목록으로 돌아가기 */}
+      {/* =====================================
+         목록으로 돌아가기
+      ===================================== */}
 
       <section className="section container">
         <Link
