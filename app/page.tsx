@@ -2,7 +2,6 @@
 "use client";
 
 import Link from "next/link";
-
 import {
   useCallback,
   useEffect,
@@ -11,9 +10,7 @@ import {
 } from "react";
 
 import { regions, services } from "./data";
-
 import type { Company } from "./data";
-
 import Footer from "./Footer";
 
 /* =====================================
@@ -31,37 +28,126 @@ const SUPABASE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
 /* =====================================
-   서울 25개 구
+   전국 시·도
 
-   기존에 만든 구별 쿡탑 페이지로 연결
+   두 번째 선택창의 시·군·구는
+   등록 업체의 활동 지역을 기준으로 표시
 ===================================== */
 
+const PROVINCES = [
+  {
+    name: "서울특별시",
+    short: "서울",
+    aliases: ["서울", "서울시", "서울특별시"],
+  },
+  {
+    name: "부산광역시",
+    short: "부산",
+    aliases: ["부산", "부산시", "부산광역시"],
+  },
+  {
+    name: "대구광역시",
+    short: "대구",
+    aliases: ["대구", "대구시", "대구광역시"],
+  },
+  {
+    name: "인천광역시",
+    short: "인천",
+    aliases: ["인천", "인천시", "인천광역시"],
+  },
+  {
+    name: "광주광역시",
+    short: "광주",
+    aliases: ["광주", "광주시", "광주광역시"],
+  },
+  {
+    name: "대전광역시",
+    short: "대전",
+    aliases: ["대전", "대전시", "대전광역시"],
+  },
+  {
+    name: "울산광역시",
+    short: "울산",
+    aliases: ["울산", "울산시", "울산광역시"],
+  },
+  {
+    name: "세종특별자치시",
+    short: "세종",
+    aliases: ["세종", "세종시", "세종특별자치시"],
+  },
+  {
+    name: "경기도",
+    short: "경기",
+    aliases: ["경기", "경기도"],
+  },
+  {
+    name: "강원특별자치도",
+    short: "강원",
+    aliases: ["강원", "강원도", "강원특별자치도"],
+  },
+  {
+    name: "충청북도",
+    short: "충북",
+    aliases: ["충북", "충청북도"],
+  },
+  {
+    name: "충청남도",
+    short: "충남",
+    aliases: ["충남", "충청남도"],
+  },
+  {
+    name: "전북특별자치도",
+    short: "전북",
+    aliases: ["전북", "전라북도", "전북특별자치도"],
+  },
+  {
+    name: "전라남도",
+    short: "전남",
+    aliases: ["전남", "전라남도"],
+  },
+  {
+    name: "경상북도",
+    short: "경북",
+    aliases: ["경북", "경상북도"],
+  },
+  {
+    name: "경상남도",
+    short: "경남",
+    aliases: ["경남", "경상남도"],
+  },
+  {
+    name: "제주특별자치도",
+    short: "제주",
+    aliases: ["제주", "제주도", "제주특별자치도"],
+  },
+] as const;
+
 const SEOUL_DISTRICTS = [
-  { slug: "gangnam-gu", name: "강남구" },
-  { slug: "gangdong-gu", name: "강동구" },
-  { slug: "gangbuk-gu", name: "강북구" },
-  { slug: "gangseo-gu", name: "강서구" },
-  { slug: "gwanak-gu", name: "관악구" },
-  { slug: "gwangjin-gu", name: "광진구" },
-  { slug: "guro-gu", name: "구로구" },
-  { slug: "geumcheon-gu", name: "금천구" },
-  { slug: "nowon-gu", name: "노원구" },
-  { slug: "dobong-gu", name: "도봉구" },
-  { slug: "dongdaemun-gu", name: "동대문구" },
-  { slug: "dongjak-gu", name: "동작구" },
-  { slug: "mapo-gu", name: "마포구" },
-  { slug: "seodaemun-gu", name: "서대문구" },
-  { slug: "seocho-gu", name: "서초구" },
-  { slug: "seongdong-gu", name: "성동구" },
-  { slug: "seongbuk-gu", name: "성북구" },
-  { slug: "songpa-gu", name: "송파구" },
-  { slug: "yangcheon-gu", name: "양천구" },
-  { slug: "yeongdeungpo-gu", name: "영등포구" },
-  { slug: "yongsan-gu", name: "용산구" },
-  { slug: "eunpyeong-gu", name: "은평구" },
-  { slug: "jongno-gu", name: "종로구" },
-  { slug: "jung-gu", name: "중구" },
-  { slug: "jungnang-gu", name: "중랑구" },
+  "강남구",
+  "강동구",
+  "강북구",
+  "강서구",
+  "관악구",
+  "광진구",
+  "구로구",
+  "금천구",
+  "노원구",
+  "도봉구",
+  "동대문구",
+  "동작구",
+  "마포구",
+  "서대문구",
+  "서초구",
+  "성동구",
+  "성북구",
+  "송파구",
+  "양천구",
+  "영등포구",
+  "용산구",
+  "은평구",
+  "종로구",
+  "중구",
+  "중랑구",
 ] as const;
 
 /* =====================================
@@ -110,7 +196,7 @@ function toCompany(
 }
 
 /* =====================================
-   업체별 대표 이미지
+   이미지
 ===================================== */
 
 function isEasyHomecare(
@@ -135,8 +221,12 @@ function getCompanyImage(
 }
 
 /* =====================================
-   검색어 정리
+   지역명 처리
 ===================================== */
+
+function compact(value: string): string {
+  return value.replace(/\s+/g, "").trim();
+}
 
 function normalizeKeyword(
   value: string
@@ -145,6 +235,202 @@ function normalizeKeyword(
     .trim()
     .replace(/\s+/g, " ")
     .toLowerCase();
+}
+
+function getProvince(
+  provinceName: string
+) {
+  return PROVINCES.find(
+    (item) => item.name === provinceName
+  );
+}
+
+function hasProvinceName(
+  region: string,
+  provinceName: string
+): boolean {
+  const province = getProvince(provinceName);
+
+  if (!province) {
+    return false;
+  }
+
+  const value = compact(region);
+
+  return province.aliases.some(
+    (alias) => value.includes(alias)
+  );
+}
+
+function isNationwide(
+  region: string
+): boolean {
+  const value = compact(region);
+
+  return [
+    "전국",
+    "전국전체",
+    "전국전지역",
+    "전국시공",
+  ].includes(value);
+}
+
+function isWholeProvince(
+  region: string,
+  provinceName: string
+): boolean {
+  const province = getProvince(provinceName);
+
+  if (!province) {
+    return false;
+  }
+
+  const value = compact(region);
+
+  return province.aliases.some((alias) =>
+    [
+      alias,
+      `${alias}전체`,
+      `${alias}전지역`,
+      `${alias}전역`,
+    ].includes(value)
+  );
+}
+
+function servesProvince(
+  company: CompanyWithWebsite,
+  provinceName: string
+): boolean {
+  return company.regions.some(
+    (region) =>
+      isNationwide(region) ||
+      hasProvinceName(region, provinceName) ||
+      (
+        provinceName === "서울특별시" &&
+        ["수도권", "수도권전체", "수도권전지역"]
+          .includes(compact(region))
+      ) ||
+      (
+        provinceName === "경기도" &&
+        ["수도권", "수도권전체", "수도권전지역"]
+          .includes(compact(region))
+      ) ||
+      (
+        provinceName === "인천광역시" &&
+        ["수도권", "수도권전체", "수도권전지역"]
+          .includes(compact(region))
+      )
+  );
+}
+
+function servesDistrict(
+  company: CompanyWithWebsite,
+  provinceName: string,
+  districtName: string
+): boolean {
+  if (!servesProvince(company, provinceName)) {
+    return false;
+  }
+
+  const district = compact(districtName);
+
+  return company.regions.some((region) => {
+    const value = compact(region);
+
+    if (
+      isNationwide(region) ||
+      isWholeProvince(region, provinceName)
+    ) {
+      return true;
+    }
+
+    if (
+      ["서울특별시", "경기도", "인천광역시"]
+        .includes(provinceName) &&
+      ["수도권", "수도권전체", "수도권전지역"]
+        .includes(value)
+    ) {
+      return true;
+    }
+
+    if (!value.includes(district)) {
+      return false;
+    }
+
+    // 다른 시·도가 명시된 지역은 제외
+    const otherProvince = PROVINCES.some(
+      (province) =>
+        province.name !== provinceName &&
+        province.aliases.some((alias) =>
+          value.startsWith(alias)
+        )
+    );
+
+    return !otherProvince;
+  });
+}
+
+/* =====================================
+   등록된 지역에서 시·군·구 추출
+
+   전국 행정구역 전체 데이터가 아니라
+   업체가 등록한 지역을 보여주는 방식
+===================================== */
+
+function extractDistricts(
+  companies: CompanyWithWebsite[],
+  provinceName: string
+): string[] {
+  const province = getProvince(provinceName);
+
+  if (!province) {
+    return [];
+  }
+
+  if (provinceName === "서울특별시") {
+    return [...SEOUL_DISTRICTS];
+  }
+
+  const found = new Set<string>();
+
+  for (const company of companies) {
+    for (const region of company.regions) {
+      if (!hasProvinceName(region, provinceName)) {
+        continue;
+      }
+
+      let value = compact(region);
+
+      const aliases = [...province.aliases]
+        .sort((a, b) => b.length - a.length);
+
+      for (const alias of aliases) {
+        if (value.startsWith(alias)) {
+          value = value.slice(alias.length);
+          break;
+        }
+      }
+
+      if (
+        !value ||
+        ["전체", "전지역", "전역"].includes(value)
+      ) {
+        continue;
+      }
+
+      const match = value.match(
+        /^(.+?(?:시|군|구))(?=$|.+)/
+      );
+
+      if (match) {
+        found.add(match[1]);
+      }
+    }
+  }
+
+  return [...found].sort(
+    (a, b) => a.localeCompare(b, "ko")
+  );
 }
 
 /* =====================================
@@ -218,23 +504,52 @@ export default function Home() {
     useState("");
 
   /* =====================================
-     서울 지역 선택 메뉴
+     전국 지역 선택 상태
   ===================================== */
 
-  const [showSeoulDistricts, setShowSeoulDistricts] =
+  const [selectedProvince, setSelectedProvince] =
+    useState("");
+
+  const [selectedDistrict, setSelectedDistrict] =
+    useState("");
+
+  const [showRegionFinder, setShowRegionFinder] =
     useState(false);
 
-  function openSeoulDistricts() {
-    setShowSeoulDistricts(true);
+  const availableDistricts = useMemo(
+    () =>
+      selectedProvince
+        ? extractDistricts(
+            companies,
+            selectedProvince
+          )
+        : [],
+    [companies, selectedProvince]
+  );
+
+  function openRegionFinder() {
+    setShowRegionFinder(true);
 
     requestAnimationFrame(() => {
       document
-        .getElementById("seoul-regions")
+        .getElementById("region-finder")
         ?.scrollIntoView({
           behavior: "smooth",
           block: "start",
         });
     });
+  }
+
+  function selectProvince(value: string) {
+    setSelectedProvince(value);
+    setSelectedDistrict("");
+    setRegion("");
+  }
+
+  function clearRegionSelection() {
+    setSelectedProvince("");
+    setSelectedDistrict("");
+    setRegion("");
   }
 
   /* =====================================
@@ -249,42 +564,63 @@ export default function Home() {
       setError(
         "업체 검색 설정을 확인할 수 없습니다."
       );
-
       setLoading(false);
       return;
     }
 
     try {
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/approved_companies?select=id,name,description,phone,regions,services,images,website_url`,
-        {
-          method: "GET",
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
-          },
-          cache: "no-store",
+      const allRows: CompanyRow[] = [];
+      const pageSize = 500;
+      let offset = 0;
+
+      while (true) {
+        const query = new URLSearchParams({
+          select:
+            "id,name,description,phone,regions,services,images,website_url",
+          order: "id.asc",
+          limit: String(pageSize),
+          offset: String(offset),
+        });
+
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/approved_companies?${query.toString()}`,
+          {
+            method: "GET",
+            headers: {
+              apikey: SUPABASE_KEY,
+              Authorization: `Bearer ${SUPABASE_KEY}`,
+            },
+            cache: "no-store",
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `업체 목록을 불러오지 못했습니다. (${response.status})`
+          );
         }
-      );
 
-      if (!response.ok) {
-        throw new Error(
-          `업체 목록을 불러오지 못했습니다. (${response.status})`
-        );
+        const rows: unknown =
+          await response.json();
+
+        if (!Array.isArray(rows)) {
+          throw new Error(
+            "업체 목록의 응답 형식이 올바르지 않습니다."
+          );
+        }
+
+        const pageRows = rows as CompanyRow[];
+
+        allRows.push(...pageRows);
+
+        if (pageRows.length < pageSize) {
+          break;
+        }
+
+        offset += pageSize;
       }
 
-      const rows: unknown =
-        await response.json();
-
-      if (!Array.isArray(rows)) {
-        throw new Error(
-          "업체 목록의 응답 형식이 올바르지 않습니다."
-        );
-      }
-
-      setCompanies(
-        (rows as CompanyRow[]).map(toCompany)
-      );
+      setCompanies(allRows.map(toCompany));
     } catch (err) {
       setError(
         err instanceof Error
@@ -297,7 +633,7 @@ export default function Home() {
   }, []);
 
   /* =====================================
-     인기 검색어 불러오기
+     인기 검색어 TOP 10
   ===================================== */
 
   const loadPopularKeywords =
@@ -309,7 +645,6 @@ export default function Home() {
         setPopularError(
           "인기 검색어 연결 설정을 확인할 수 없습니다."
         );
-
         setPopularLoading(false);
         return;
       }
@@ -362,10 +697,6 @@ export default function Home() {
       }
     }, []);
 
-  /* =====================================
-     최초 데이터 불러오기
-  ===================================== */
-
   useEffect(() => {
     void loadCompanies();
     void loadPopularKeywords();
@@ -413,17 +744,14 @@ export default function Home() {
 
         await loadPopularKeywords();
       } catch (err) {
-        console.error(
-          "검색어 기록 오류:",
-          err
-        );
+        console.error("검색어 기록 오류:", err);
       }
     },
     [loadPopularKeywords]
   );
 
   /* =====================================
-     검색 결과 위치로 이동
+     검색 및 이동
   ===================================== */
 
   function scrollToResults() {
@@ -449,12 +777,34 @@ export default function Home() {
     scrollToResults();
   }
 
+  function showRegionResults() {
+    setRegion("");
+    setKeyword("");
+    setKeywordInput("");
+    scrollToResults();
+  }
+
   /* =====================================
-     업체 검색
+     업체 필터링
   ===================================== */
 
   const filtered = useMemo(() => {
     return companies.filter((company) => {
+      const matchProvince =
+        !selectedProvince ||
+        (
+          selectedDistrict
+            ? servesDistrict(
+                company,
+                selectedProvince,
+                selectedDistrict
+              )
+            : servesProvince(
+                company,
+                selectedProvince
+              )
+        );
+
       const matchRegion =
         !region ||
         company.regions.includes(region);
@@ -477,6 +827,7 @@ export default function Home() {
         searchableText.includes(keyword);
 
       return (
+        matchProvince &&
         matchRegion &&
         matchService &&
         matchKeyword
@@ -484,6 +835,8 @@ export default function Home() {
     });
   }, [
     companies,
+    selectedProvince,
+    selectedDistrict,
     region,
     service,
     keyword,
@@ -512,18 +865,19 @@ export default function Home() {
         >
           <button
             type="button"
-            onClick={openSeoulDistricts}
+            onClick={openRegionFinder}
             style={{
-              padding: "8px 10px",
-              border: "1px solid #2563eb",
-              borderRadius: "8px",
+              padding: "8px 11px",
+              border: "1px solid #dbeafe",
+              borderRadius: "9px",
               background: "#eff6ff",
               color: "#1d4ed8",
-              fontWeight: 800,
+              fontWeight: 700,
               cursor: "pointer",
+              fontSize: "13px",
             }}
           >
-            📍 지역 선택
+            📍 지역별 찾기
           </button>
 
           <Link href="/companies">
@@ -564,10 +918,12 @@ export default function Home() {
           >
             <select
               value={region}
-              onChange={(event) =>
-                setRegion(event.target.value)
-              }
-              aria-label="지역 선택"
+              onChange={(event) => {
+                setRegion(event.target.value);
+                setSelectedProvince("");
+                setSelectedDistrict("");
+              }}
+              aria-label="기존 지역 검색"
             >
               <option value="">
                 전체 지역
@@ -623,39 +979,33 @@ export default function Home() {
             </button>
           </form>
 
-          {/* 지역별 페이지 이동 버튼 */}
-
           <button
             type="button"
-            onClick={openSeoulDistricts}
+            onClick={openRegionFinder}
             style={{
-              display: "block",
-              width: "100%",
-              maxWidth: "520px",
-              margin: "22px auto 0",
-              padding: "16px 20px",
-              border: "2px solid #2563eb",
-              borderRadius: "14px",
-              background: "#ffffff",
+              marginTop: "16px",
+              padding: "10px 4px",
+              border: "none",
+              background: "transparent",
               color: "#1d4ed8",
-              fontSize: "17px",
-              fontWeight: 800,
+              fontSize: "14px",
+              fontWeight: 700,
               cursor: "pointer",
-              boxShadow:
-                "0 5px 18px rgba(37, 99, 235, 0.10)",
+              textDecoration: "underline",
+              textUnderlineOffset: "4px",
             }}
           >
-            📍 서울 지역별 업체 찾기 →
+            📍 시·도 / 시·군·구로 업체 찾기 →
           </button>
         </div>
       </section>
 
       {/* =====================================
-         서울 25개 구 선택 메뉴
+         전국 지역별 업체 찾기
       ===================================== */}
 
       <section
-        id="seoul-regions"
+        id="region-finder"
         className="section container"
         style={{
           scrollMarginTop: "20px",
@@ -663,127 +1013,267 @@ export default function Home() {
       >
         <div
           style={{
-            padding: "24px",
-            border: "1px solid #bfdbfe",
+            border: "1px solid #e2e8f0",
             borderRadius: "18px",
-            background: "#eff6ff",
+            padding: "22px",
+            background: "#ffffff",
+            boxShadow:
+              "0 5px 20px rgba(15,23,42,0.04)",
           }}
         >
-          <h2
+          <div
             style={{
-              marginTop: 0,
-              color: "#1e40af",
-              fontSize: "24px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "10px",
             }}
           >
-            📍 서울 지역별 업체 찾기
-          </h2>
-
-          <p
-            style={{
-              color: "#475569",
-              lineHeight: 1.7,
-            }}
-          >
-            서울 전체 또는 원하는 구를 선택해
-            해당 지역의 쿡탑 설치·교체 업체를
-            확인하세요.
-          </p>
-
-          <button
-            type="button"
-            onClick={() =>
-              setShowSeoulDistricts(
-                (previous) => !previous
-              )
-            }
-            aria-expanded={showSeoulDistricts}
-            aria-controls="seoul-district-list"
-            style={{
-              width: "100%",
-              padding: "16px",
-              border: "none",
-              borderRadius: "12px",
-              background: "#2563eb",
-              color: "#ffffff",
-              fontSize: "17px",
-              fontWeight: 800,
-              cursor: "pointer",
-            }}
-          >
-            {showSeoulDistricts
-              ? "서울 25개 구 목록 닫기 ▲"
-              : "서울 25개 구 선택하기 ▼"}
-          </button>
-
-          {showSeoulDistricts && (
-            <div
-              id="seoul-district-list"
-              style={{
-                marginTop: "18px",
-              }}
-            >
-              <Link
-                href="/seoul/cooktop"
+            <div>
+              <span
                 style={{
-                  display: "block",
-                  padding: "15px",
-                  marginBottom: "12px",
-                  borderRadius: "10px",
-                  background: "#1d4ed8",
-                  color: "#ffffff",
-                  textAlign: "center",
-                  textDecoration: "none",
+                  display: "inline-block",
+                  color: "#2563eb",
+                  fontSize: "12px",
                   fontWeight: 800,
+                  marginBottom: "6px",
                 }}
               >
-                서울 전체 쿡탑 설치·교체 업체 →
-              </Link>
+                FIND BY LOCATION
+              </span>
 
+              <h2
+                style={{
+                  margin: 0,
+                  color: "#0f172a",
+                  fontSize: "23px",
+                }}
+              >
+                📍 지역별 업체 찾기
+              </h2>
+
+              <p
+                style={{
+                  marginBottom: 0,
+                  color: "#64748b",
+                  fontSize: "14px",
+                  lineHeight: 1.7,
+                }}
+              >
+                원하는 시·도와 시·군·구를
+                선택해 보세요.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                setShowRegionFinder(
+                  (previous) => !previous
+                )
+              }
+              aria-expanded={showRegionFinder}
+              style={{
+                padding: "10px 14px",
+                border: "1px solid #cbd5e1",
+                borderRadius: "10px",
+                background: "#f8fafc",
+                color: "#334155",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {showRegionFinder
+                ? "접기 ▲"
+                : "지역 선택 ▼"}
+            </button>
+          </div>
+
+          {showRegionFinder && (
+            <div
+              style={{
+                marginTop: "22px",
+                paddingTop: "20px",
+                borderTop: "1px solid #e2e8f0",
+              }}
+            >
               <div
                 style={{
                   display: "grid",
                   gridTemplateColumns:
-                    "repeat(auto-fit, minmax(min(100%, 130px), 1fr))",
-                  gap: "10px",
+                    "repeat(auto-fit, minmax(min(100%, 210px), 1fr))",
+                  gap: "12px",
                 }}
               >
-                {SEOUL_DISTRICTS.map(
-                  (district) => (
-                    <Link
-                      key={district.slug}
-                      href={`/seoul/${district.slug}/cooktop`}
-                      style={{
-                        display: "block",
-                        padding: "14px 10px",
-                        border: "1px solid #bfdbfe",
-                        borderRadius: "10px",
-                        background: "#ffffff",
-                        color: "#1d4ed8",
-                        textAlign: "center",
-                        textDecoration: "none",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {district.name} →
-                    </Link>
-                  )
+                <label
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    color: "#334155",
+                    fontSize: "13px",
+                    fontWeight: 800,
+                  }}
+                >
+                  01. 시·도 선택
+
+                  <select
+                    value={selectedProvince}
+                    onChange={(event) =>
+                      selectProvince(event.target.value)
+                    }
+                    style={{
+                      width: "100%",
+                      padding: "14px",
+                      border: "1px solid #cbd5e1",
+                      borderRadius: "11px",
+                      background: "#ffffff",
+                      color: "#0f172a",
+                      fontSize: "15px",
+                    }}
+                  >
+                    <option value="">
+                      전국 전체
+                    </option>
+
+                    {PROVINCES.map((province) => (
+                      <option
+                        key={province.name}
+                        value={province.name}
+                      >
+                        {province.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    color: "#334155",
+                    fontSize: "13px",
+                    fontWeight: 800,
+                  }}
+                >
+                  02. 시·군·구 선택
+
+                  <select
+                    value={selectedDistrict}
+                    disabled={!selectedProvince}
+                    onChange={(event) => {
+                      setSelectedDistrict(
+                        event.target.value
+                      );
+                      setRegion("");
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "14px",
+                      border: "1px solid #cbd5e1",
+                      borderRadius: "11px",
+                      background: selectedProvince
+                        ? "#ffffff"
+                        : "#f1f5f9",
+                      color: "#0f172a",
+                      fontSize: "15px",
+                    }}
+                  >
+                    <option value="">
+                      {selectedProvince
+                        ? "시·군·구 전체"
+                        : "시·도를 먼저 선택"}
+                    </option>
+
+                    {availableDistricts.map(
+                      (district) => (
+                        <option
+                          key={district}
+                          value={district}
+                        >
+                          {district}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </label>
+              </div>
+
+              {selectedProvince &&
+                availableDistricts.length === 0 && (
+                  <p
+                    style={{
+                      color: "#64748b",
+                      fontSize: "13px",
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    현재 등록 업체의 지역 정보에서
+                    선택 가능한 시·군·구가 없습니다.
+                    시·도 전체로 검색할 수 있습니다.
+                  </p>
                 )}
+
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "10px",
+                  marginTop: "18px",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={showRegionResults}
+                  style={{
+                    flex: "1 1 180px",
+                    padding: "14px 18px",
+                    border: "none",
+                    borderRadius: "11px",
+                    background: "#2563eb",
+                    color: "#ffffff",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                >
+                  {selectedDistrict
+                    ? `${selectedDistrict} 업체 보기 →`
+                    : selectedProvince
+                    ? `${getProvince(selectedProvince)?.short ?? ""} 전체 업체 보기 →`
+                    : "전국 업체 보기 →"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={clearRegionSelection}
+                  style={{
+                    padding: "14px 18px",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "11px",
+                    background: "#ffffff",
+                    color: "#475569",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  지역 초기화
+                </button>
               </div>
 
               <p
                 style={{
-                  marginTop: "16px",
                   marginBottom: 0,
+                  marginTop: "14px",
                   color: "#64748b",
-                  fontSize: "13px",
+                  fontSize: "12px",
                   lineHeight: 1.7,
                 }}
               >
-                현재 지역별 바로가기는 기존에 만든
-                쿡탑 설치·교체 페이지로 연결됩니다.
-                동별 선택 메뉴는 실제 동 목록과
-                페이지 오류를 정리한 뒤 연결합니다.
+                지역 선택 결과는 현재 등록된
+                업체의 활동 지역 정보를 기준으로
+                표시됩니다.
               </p>
             </div>
           )}
@@ -897,7 +1387,7 @@ export default function Home() {
                     key={item.keyword}
                     type="button"
                     onClick={() => {
-                      setRegion("");
+                      clearRegionSelection();
                       setService("");
                       runSearch(item.keyword);
                     }}
@@ -940,8 +1430,7 @@ export default function Home() {
 
                       <span
                         style={{
-                          overflowWrap:
-                            "anywhere",
+                          overflowWrap: "anywhere",
                           fontSize: "15px",
                           fontWeight: 600,
                         }}
@@ -1076,6 +1565,21 @@ export default function Home() {
               ? "업체 목록을 불러오지 못했습니다."
               : `검색 조건에 맞는 업체 ${filtered.length}곳`}
           </p>
+
+          {selectedProvince && (
+            <p
+              style={{
+                color: "#2563eb",
+                fontWeight: 700,
+                fontSize: "14px",
+              }}
+            >
+              📍 {selectedProvince}
+              {selectedDistrict
+                ? ` · ${selectedDistrict}`
+                : " 전체"}
+            </p>
+          )}
         </div>
 
         {error && (
@@ -1147,23 +1651,17 @@ export default function Home() {
                         등록 업체
                       </span>
 
-                      <h3>
-                        {company.name}
-                      </h3>
+                      <h3>{company.name}</h3>
 
-                      <p>
-                        {company.description}
-                      </p>
+                      <p>{company.description}</p>
 
                       <div className="companyInfo">
                         <span>
-                          📍{" "}
-                          {company.regions.join(", ")}
+                          📍 {company.regions.join(", ")}
                         </span>
 
                         <span>
-                          🛠️{" "}
-                          {company.services.join(", ")}
+                          🛠️ {company.services.join(", ")}
                         </span>
                       </div>
 
