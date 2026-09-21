@@ -13,8 +13,12 @@ const SITE_NAME = "집수리모아";
 const SITE_TITLE =
   "집수리모아 | 전국 집수리 업체 찾기 및 업체 등록";
 
+/*
+  네이버 사이트 간단 체크용 설명문
+  80자 이내로 간결하게 작성
+*/
 const SITE_DESCRIPTION =
-  "집수리모아에서 서울·경기·인천·충남·충북 등 전국 집수리 업체를 찾아보세요. 싱크볼 리폼, 쿡탑 설치·교체, 냉장고 철거, 벌목, 욕실 수리, 전기·조명, 수전 교체, 펫도어 설치 등 다양한 시공 분야의 업체 정보와 서비스 지역을 확인하고 홈페이지 및 전화로 문의할 수 있습니다.";
+  "전국 집수리 업체를 지역과 시공 종류별로 찾아보세요. 쿡탑 교체, 싱크볼 리폼, 벌목 등 업체 정보를 확인할 수 있습니다.";
 
 /* =====================================
    검색엔진 메타데이터
@@ -56,10 +60,6 @@ export const metadata: Metadata = {
     "냉장고 철거",
   ],
 
-  alternates: {
-    canonical: SITE_URL,
-  },
-
   openGraph: {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
@@ -87,6 +87,8 @@ export const metadata: Metadata = {
 
 /* =====================================
    전체 홈페이지 레이아웃
+
+   기존 globals.css 연결 유지
 ===================================== */
 
 export default function RootLayout({
