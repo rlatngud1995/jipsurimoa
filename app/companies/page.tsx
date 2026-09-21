@@ -50,6 +50,11 @@ type CompanyRow = {
   website_url: string | null;
 };
 
+type PopularKeyword = {
+  keyword: string;
+  search_count: number;
+};
+
 function toCompany(
   row: CompanyRow
 ): CompanyWithWebsite {
@@ -101,6 +106,17 @@ function getCompanyImage(
 }
 
 /* =====================================
+   검색어 정리
+===================================== */
+
+function normalizeKeyword(value: string): string {
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+/* =====================================
    업체 찾기 페이지
 ===================================== */
 
@@ -110,7 +126,19 @@ export default function CompaniesPage() {
 
   const [region, setRegion] = useState("");
   const [service, setService] = useState("");
+
+  // 입력 중인 검색어와 실제 검색에 적용된 검색어 분리
+  const [keywordInput, setKeywordInput] = useState("");
   const [keyword, setKeyword] = useState("");
+
+  const [popularKeywords, setPopularKeywords] =
+    useState<PopularKeyword[]>([]);
+
+  const [popularLoading, setPopularLoading] =
+    useState(true);
+
+  const [popularError, setPopularError] =
+    useState("");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -172,18 +200,190 @@ export default function CompaniesPage() {
     }
   }, []);
 
-  useEffect(() => {
-    void loadCompanies();
-  }, [loadCompanies]);
+  /* =====================================
+     인기 검색어 TOP 10 불러오기
+  ===================================== */
+
+  const loadPopularKeywords = useCallback(async () => {
+    setPopularLoading(true);
+    setPopularError("");
+
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      setPopularError(
+        "인기 검색어 연결 설정을 확인할 수 없습니다."
+      );
+      setPopularLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/rpc/get_popular_keywords`,
+        {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({}),
+          cache: "no-store",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `인기 검색어를 불러오지 못했습니다. (${response.status})`
+        );
+      }
+
+      const rows: unknown = await response.json();
+
+      if (!Array.isArray(rows)) {
+        throw new Error(
+          "인기 검색어 응답 형식이 올바르지 않습니다."
+        );
+      }
+
+      setPopularKeywords(
+        (rows as PopularKeyword[]).filter(
+          (item) =>
+            typeof item.keyword === "string" &&
+            typeof item.search_count === "number"
+        )
+      );
+    } catch (err) {
+      setPopularError(
+        err instanceof Error
+          ? err.message
+          : "인기 검색어를 불러오지 못했습니다."
+      );
+    } finally {
+      setPopularLoading(false);
+    }
+  }, []);
 
   /* =====================================
-     업체 검색
+     최초 페이지 로딩
+  ===================================== */
+
+  useEffect(() => {
+    void loadCompanies();
+    void loadPopularKeywords();
+
+    // 인기 검색어 링크 등으로 전달된 검색어 적용
+    const params = new URLSearchParams(
+      window.location.search
+    );
+
+    const initialKeyword =
+      params.get("keyword") ?? "";
+
+    if (initialKeyword) {
+      setKeywordInput(initialKeyword);
+      setKeyword(
+        normalizeKeyword(initialKeyword)
+      );
+    }
+  }, [loadCompanies, loadPopularKeywords]);
+
+  /* =====================================
+     검색어 기록
+  ===================================== */
+
+  const recordKeyword = useCallback(
+    async (value: string) => {
+      const normalized =
+        normalizeKeyword(value);
+
+      if (
+        normalized.length < 2 ||
+        normalized.length > 50 ||
+        !SUPABASE_URL ||
+        !SUPABASE_KEY
+      ) {
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/rpc/record_search_keyword`,
+          {
+            method: "POST",
+            headers: {
+              apikey: SUPABASE_KEY,
+              Authorization: `Bearer ${SUPABASE_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              p_keyword: normalized,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `검색 기록 저장 실패 (${response.status})`
+          );
+        }
+
+        // 기록 저장 후 인기 검색어 순위 갱신
+        await loadPopularKeywords();
+      } catch (err) {
+        // 검색 기록 저장에 실패해도 업체 검색은 유지
+        console.error(
+          "검색어 기록 오류:",
+          err
+        );
+      }
+    },
+    [loadPopularKeywords]
+  );
+
+  /* =====================================
+     검색 실행
+  ===================================== */
+
+  const runSearch = useCallback(
+    (value: string) => {
+      const normalized =
+        normalizeKeyword(value);
+
+      setKeywordInput(value);
+      setKeyword(normalized);
+
+      // 검색어를 주소에도 반영해 공유 가능하게 설정
+      const url = new URL(
+        window.location.href
+      );
+
+      if (normalized) {
+        url.searchParams.set(
+          "keyword",
+          normalized
+        );
+      } else {
+        url.searchParams.delete("keyword");
+      }
+
+      window.history.replaceState(
+        null,
+        "",
+        `${url.pathname}${url.search}${url.hash}`
+      );
+
+      if (normalized) {
+        void recordKeyword(normalized);
+      }
+    },
+    [recordKeyword]
+  );
+
+  /* =====================================
+     업체 검색 결과
   ===================================== */
 
   const results = useMemo(() => {
-    const normalizedKeyword =
-      keyword.trim().toLowerCase();
-
     return companies.filter((company) => {
       const matchRegion =
         !region ||
@@ -203,10 +403,8 @@ export default function CompaniesPage() {
         .toLowerCase();
 
       const matchKeyword =
-        !normalizedKeyword ||
-        searchableText.includes(
-          normalizedKeyword
-        );
+        !keyword ||
+        searchableText.includes(keyword);
 
       return (
         matchRegion &&
@@ -251,10 +449,138 @@ export default function CompaniesPage() {
         </div>
       </section>
 
+      {/* 인기 검색어 TOP 10 */}
+
+      <section className="section container">
+        <div
+          className="detailCard"
+          style={{
+            padding: "24px",
+          }}
+        >
+          <div className="sectionTitle">
+            <h2>🔥 인기 검색어 TOP 10</h2>
+
+            <p>
+              최근 30일간 집수리모아에서
+              검색된 키워드 기준입니다.
+            </p>
+          </div>
+
+          {popularLoading ? (
+            <p>인기 검색어를 불러오는 중...</p>
+          ) : popularError ? (
+            <div
+              role="alert"
+              style={{
+                color: "#b91c1c",
+              }}
+            >
+              <p>{popularError}</p>
+
+              <button
+                type="button"
+                className="outlineButton"
+                onClick={() => {
+                  void loadPopularKeywords();
+                }}
+              >
+                다시 불러오기
+              </button>
+            </div>
+          ) : popularKeywords.length === 0 ? (
+            <div className="emptyBox">
+              아직 집계된 검색어가 없습니다.
+              첫 검색을 해보세요!
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gap: "10px",
+              }}
+            >
+              {popularKeywords.map(
+                (item, index) => (
+                  <button
+                    key={item.keyword}
+                    type="button"
+                    onClick={() => {
+                      runSearch(item.keyword);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent:
+                        "space-between",
+                      gap: "12px",
+                      width: "100%",
+                      padding: "14px 16px",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "12px",
+                      background: "#ffffff",
+                      color: "#111827",
+                      textAlign: "left",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        minWidth: 0,
+                      }}
+                    >
+                      <strong
+                        style={{
+                          minWidth: "24px",
+                          color:
+                            index < 3
+                              ? "#ea580c"
+                              : "#6b7280",
+                        }}
+                      >
+                        {index + 1}
+                      </strong>
+
+                      <span
+                        style={{
+                          overflowWrap:
+                            "anywhere",
+                        }}
+                      >
+                        {item.keyword}
+                      </span>
+                    </span>
+
+                    <span
+                      style={{
+                        flexShrink: 0,
+                        color: "#6b7280",
+                        fontSize: "13px",
+                      }}
+                    >
+                      {item.search_count}회
+                    </span>
+                  </button>
+                )
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* 검색 필터 */}
 
       <section className="section container">
-        <div className="filterBox">
+        <form
+          className="filterBox"
+          onSubmit={(event) => {
+            event.preventDefault();
+            runSearch(keywordInput);
+          }}
+        >
           <select
             value={region}
             onChange={(event) =>
@@ -296,13 +622,21 @@ export default function CompaniesPage() {
           <input
             type="search"
             placeholder="업체명 또는 시공 키워드"
-            value={keyword}
+            value={keywordInput}
             onChange={(event) =>
-              setKeyword(event.target.value)
+              setKeywordInput(event.target.value)
             }
-            aria-label="업체명 검색"
+            aria-label="업체명 또는 시공 키워드"
+            maxLength={50}
           />
-        </div>
+
+          <button
+            type="submit"
+            className="primaryButton"
+          >
+            🔍 검색
+          </button>
+        </form>
 
         {/* 검색 결과 */}
 
