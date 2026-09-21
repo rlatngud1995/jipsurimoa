@@ -1,13 +1,249 @@
 
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { companies } from "../../data";
 
-export function generateStaticParams() {
-  return companies.map((company) => ({
-    id: company.id,
-  }));
+import Footer from "../../Footer";
+
+/* =====================================
+   기본 설정
+===================================== */
+
+const SITE_URL = "https://www.jipsurimoa.com";
+
+const EASY_HOMECARE_URL =
+  "https://easyhomecare.vercel.app/";
+
+const EASY_HOMECARE_IMAGE = "/IMG_0778.png";
+
+/* =====================================
+   Supabase 연결
+===================================== */
+
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL
+    ?.replace(/\/rest\/v1\/?$/, "")
+    .replace(/\/$/, "") ?? "";
+
+const SUPABASE_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+
+/* =====================================
+   업체 데이터 타입
+===================================== */
+
+type CompanyRow = {
+  id: string;
+  name: string | null;
+  description: string | null;
+  phone: string | null;
+  regions: string[] | null;
+  services: string[] | null;
+  images: string[] | null;
+  website_url: string | null;
+};
+
+type Company = {
+  id: string;
+  name: string;
+  description: string;
+  phone: string;
+  regions: string[];
+  services: string[];
+  images: string[];
+  website_url: string | null;
+};
+
+/* =====================================
+   데이터 정리
+===================================== */
+
+function toCompany(row: CompanyRow): Company {
+  return {
+    id: row.id,
+    name: row.name ?? "",
+    description: row.description ?? "",
+    phone: row.phone ?? "",
+    regions: Array.isArray(row.regions)
+      ? row.regions
+      : [],
+    services: Array.isArray(row.services)
+      ? row.services
+      : [],
+    images: Array.isArray(row.images)
+      ? row.images
+      : [],
+    website_url: row.website_url ?? null,
+  };
 }
+
+/* =====================================
+   이지종합건설 기존 설정 유지
+===================================== */
+
+function isEasyHomecare(company: Company): boolean {
+  return (
+    company.name.replace(/\s+/g, "").trim() ===
+    "이지종합건설"
+  );
+}
+
+function getCompanyImages(company: Company): string[] {
+  if (isEasyHomecare(company)) {
+    return [
+      EASY_HOMECARE_IMAGE,
+      ...company.images.filter(
+        (image) => image !== EASY_HOMECARE_IMAGE
+      ),
+    ];
+  }
+
+  return company.images;
+}
+
+/* =====================================
+   외부 홈페이지 주소 검사
+===================================== */
+
+function getSafeWebsiteUrl(
+  value: string | null
+): string | null {
+  if (!value?.trim()) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value.trim());
+
+    if (
+      !["https:", "http:"].includes(url.protocol) ||
+      !url.hostname.includes(".") ||
+      url.username ||
+      url.password
+    ) {
+      return null;
+    }
+
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function getCompanyWebsite(
+  company: Company
+): string | null {
+  const registeredWebsite = getSafeWebsiteUrl(
+    company.website_url
+  );
+
+  if (registeredWebsite) {
+    return registeredWebsite;
+  }
+
+  if (isEasyHomecare(company)) {
+    return EASY_HOMECARE_URL;
+  }
+
+  return null;
+}
+
+/* =====================================
+   승인된 업체 1곳 조회
+
+   승인 업체 목록에서 해당 ID만 조회합니다.
+===================================== */
+
+async function getCompany(
+  id: string
+): Promise<Company | null> {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    throw new Error(
+      "Supabase 환경변수가 설정되지 않았습니다."
+    );
+  }
+
+  const query = new URLSearchParams({
+    select:
+      "id,name,description,phone,regions,services,images,website_url",
+    id: `eq.${id}`,
+    limit: "1",
+  });
+
+  const response = await fetch(
+    `${SUPABASE_URL}/rest/v1/approved_companies?${query.toString()}`,
+    {
+      method: "GET",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+      cache: "no-store",
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `업체 정보를 불러오지 못했습니다. (${response.status})`
+    );
+  }
+
+  const rows: CompanyRow[] = await response.json();
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return null;
+  }
+
+  return toCompany(rows[0]);
+}
+
+/* =====================================
+   업체별 검색엔진 메타데이터
+===================================== */
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const company = await getCompany(id);
+
+  if (!company) {
+    return {
+      title: "업체를 찾을 수 없습니다 | 집수리모아",
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
+
+  const description =
+    company.description.trim() ||
+    `${company.name}의 시공 분야와 서비스 지역, 시공사진 및 문의 정보를 집수리모아에서 확인하세요.`;
+
+  const pageUrl =
+    `${SITE_URL}/companies/${encodeURIComponent(company.id)}`;
+
+  return {
+    title: `${company.name} | 집수리모아 업체 소개`,
+    description,
+    alternates: {
+      canonical: pageUrl,
+    },
+    openGraph: {
+      title: `${company.name} | 집수리모아`,
+      description,
+      url: pageUrl,
+      type: "website",
+    },
+  };
+}
+
+/* =====================================
+   업체별 상세 홍보 페이지
+===================================== */
 
 export default async function CompanyDetail({
   params,
@@ -16,25 +252,39 @@ export default async function CompanyDetail({
 }) {
   const { id } = await params;
 
-  const company = companies.find(
-    (item) => item.id === id
-  );
+  const company = await getCompany(id);
 
   if (!company) {
     notFound();
   }
 
+  const website = getCompanyWebsite(company);
+  const images = getCompanyImages(company);
+
+  const phoneHref = company.phone.replace(
+    /[^\d+]/g,
+    ""
+  );
+
   return (
     <main>
+      {/* 상단 메뉴 */}
+
       <header className="header">
         <Link href="/" className="logo">
           🏠 집수리모아
         </Link>
 
-        <Link href="/companies">
-          업체 찾기
-        </Link>
+        <nav>
+          <Link href="/">홈</Link>
+
+          <Link href="/companies">
+            업체 찾기
+          </Link>
+        </nav>
       </header>
+
+      {/* 업체 대표 소개 */}
 
       <section className="pageHero">
         <div className="container">
@@ -44,61 +294,115 @@ export default async function CompanyDetail({
 
           <h1>{company.name}</h1>
 
-          <p>{company.description}</p>
+          <p>
+            {company.description ||
+              "업체의 시공 분야와 서비스 지역을 확인해 보세요."}
+          </p>
         </div>
       </section>
+
+      {/* 업체 기본 정보 */}
 
       <section className="section container">
         <div className="detailCard">
           <h2>업체 소개</h2>
 
-          <p>{company.description}</p>
+          <p>
+            {company.description ||
+              "업체 소개글이 아직 등록되지 않았습니다."}
+          </p>
 
           <h3>서비스 지역</h3>
 
-          <p>{company.regions.join(", ")}</p>
+          <p>
+            {company.regions.length > 0
+              ? company.regions.join(", ")
+              : "업체에 문의해 주세요."}
+          </p>
 
           <h3>전문 시공 분야</h3>
 
-          <p>{company.services.join(", ")}</p>
+          <p>
+            {company.services.length > 0
+              ? company.services.join(", ")
+              : "업체에 문의해 주세요."}
+          </p>
 
-          <h3>전화 문의</h3>
+          {/* 고객 문의 버튼 */}
 
-          <a
-            href={`tel:${company.phone}`}
-            className="primaryButton"
+          <div
+            className="companyActions"
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "12px",
+              marginTop: "24px",
+            }}
           >
-            📞 {company.phone}
-          </a>
+            {phoneHref && (
+              <a
+                href={`tel:${phoneHref}`}
+                className="primaryButton"
+              >
+                📞 {company.phone} 전화 문의
+              </a>
+            )}
+
+            {website && (
+              <a
+                href={website}
+                className="outlineButton"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                🌐 업체 홈페이지 방문
+              </a>
+            )}
+          </div>
         </div>
       </section>
+
+      {/* 시공사진 */}
 
       <section className="section container">
         <div className="sectionTitle">
-          <h2>시공사례</h2>
+          <h2>시공사례 및 업체 사진</h2>
 
           <p>
-            업체에서 등록한 실제 시공사진입니다.
+            업체가 등록한 사진을 확인해 보세요.
           </p>
         </div>
 
-        <div className="photoGrid">
-          {company.images.map((image, index) => (
-            <img
-              key={`${image}-${index}`}
-              src={image}
-              alt={`${company.name} 시공사례 ${index + 1}`}
-              loading="lazy"
-            />
-          ))}
-        </div>
-
-        {company.images.length === 0 && (
+        {images.length > 0 ? (
+          <div className="photoGrid">
+            {images.map((image, index) => (
+              <img
+                key={`${image}-${index}`}
+                src={image}
+                alt={`${company.name} 등록 사진 ${index + 1}`}
+                loading="lazy"
+              />
+            ))}
+          </div>
+        ) : (
           <div className="emptyBox">
-            아직 등록된 시공사진이 없습니다.
+            아직 등록된 사진이 없습니다.
           </div>
         )}
       </section>
+
+      {/* 목록으로 돌아가기 */}
+
+      <section className="section container">
+        <Link
+          href="/companies"
+          className="outlineButton"
+        >
+          ← 다른 업체 찾아보기
+        </Link>
+      </section>
+
+      <Footer />
     </main>
   );
 }
