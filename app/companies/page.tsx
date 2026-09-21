@@ -2,7 +2,6 @@
 "use client";
 
 import Link from "next/link";
-
 import {
   useCallback,
   useEffect,
@@ -11,20 +10,14 @@ import {
 } from "react";
 
 import { regions, services } from "../data";
-
 import type { Company } from "../data";
-
 import Footer from "../Footer";
 
 /* =====================================
    이지종합건설 기존 설정
 ===================================== */
 
-const EASY_HOMECARE_URL =
-  "https://easyhomecare.vercel.app/";
-
-const EASY_HOMECARE_IMAGE =
-  "/IMG_0778.png";
+const EASY_HOMECARE_IMAGE = "/IMG_0778.png";
 
 /* =====================================
    Supabase 연결
@@ -40,9 +33,6 @@ const SUPABASE_KEY =
 
 /* =====================================
    업체 데이터 타입
-
-   기존 Company 타입은 유지하면서
-   홈페이지 주소만 추가합니다.
 ===================================== */
 
 type CompanyWithWebsite = Company & {
@@ -95,65 +85,7 @@ function isEasyHomecare(
 }
 
 /* =====================================
-   홈페이지 주소 안전하게 확인
-
-   http 또는 https 주소만 연결합니다.
-===================================== */
-
-function getSafeWebsiteUrl(
-  value: string | null
-): string | null {
-  if (!value?.trim()) {
-    return null;
-  }
-
-  try {
-    const url = new URL(value.trim());
-
-    if (
-      !["https:", "http:"].includes(
-        url.protocol
-      ) ||
-      !url.hostname.includes(".") ||
-      url.username ||
-      url.password
-    ) {
-      return null;
-    }
-
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
-
-/* =====================================
-   업체별 홈페이지 자동 연결
-
-   1. 업체가 등록한 홈페이지 주소 우선
-   2. 이지종합건설 기존 주소 유지
-   3. 주소가 없으면 내부 상세페이지 사용
-===================================== */
-
-function getCompanyWebsite(
-  company: CompanyWithWebsite
-): string | null {
-  const registeredWebsite =
-    getSafeWebsiteUrl(company.website_url);
-
-  if (registeredWebsite) {
-    return registeredWebsite;
-  }
-
-  if (isEasyHomecare(company)) {
-    return EASY_HOMECARE_URL;
-  }
-
-  return null;
-}
-
-/* =====================================
-   업체별 대표 이미지
+   업체 대표 이미지
 ===================================== */
 
 function getCompanyImage(
@@ -163,11 +95,9 @@ function getCompanyImage(
     return EASY_HOMECARE_IMAGE;
   }
 
-  if (company.images.length > 0) {
-    return company.images[0];
-  }
-
-  return null;
+  return company.images.length > 0
+    ? company.images[0]
+    : null;
 }
 
 /* =====================================
@@ -220,8 +150,7 @@ export default function CompaniesPage() {
         );
       }
 
-      const rows: unknown =
-        await response.json();
+      const rows: unknown = await response.json();
 
       if (!Array.isArray(rows)) {
         throw new Error(
@@ -301,9 +230,7 @@ export default function CompaniesPage() {
         </Link>
 
         <nav>
-          <Link href="/">
-            홈
-          </Link>
+          <Link href="/">홈</Link>
 
           <Link href="/register">
             업체 등록
@@ -315,9 +242,7 @@ export default function CompaniesPage() {
 
       <section className="pageHero">
         <div className="container">
-          <h1>
-            집수리 업체 찾기
-          </h1>
+          <h1>집수리 업체 찾기</h1>
 
           <p>
             지역과 시공 종류를 선택해
@@ -337,9 +262,7 @@ export default function CompaniesPage() {
             }
             aria-label="지역 선택"
           >
-            <option value="">
-              전체 지역
-            </option>
+            <option value="">전체 지역</option>
 
             {regions.map((item) => (
               <option
@@ -358,9 +281,7 @@ export default function CompaniesPage() {
             }
             aria-label="시공 종류 선택"
           >
-            <option value="">
-              전체 시공
-            </option>
+            <option value="">전체 시공</option>
 
             {services.map((item) => (
               <option
@@ -399,9 +320,7 @@ export default function CompaniesPage() {
           <div
             className="emptyBox"
             role="alert"
-            style={{
-              color: "#b91c1c",
-            }}
+            style={{ color: "#b91c1c" }}
           >
             <p>{error}</p>
 
@@ -423,9 +342,6 @@ export default function CompaniesPage() {
           <>
             <div className="companyGrid">
               {results.map((company) => {
-                const website =
-                  getCompanyWebsite(company);
-
                 const companyImage =
                   getCompanyImage(company);
 
@@ -476,13 +392,9 @@ export default function CompaniesPage() {
                         등록 업체
                       </span>
 
-                      <h3>
-                        {company.name}
-                      </h3>
+                      <h3>{company.name}</h3>
 
-                      <p>
-                        {company.description}
-                      </p>
+                      <p>{company.description}</p>
 
                       <div className="companyInfo">
                         <span>
@@ -496,26 +408,17 @@ export default function CompaniesPage() {
                         </span>
                       </div>
 
-                      {/* 상세보기 및 전화 문의 */}
+                      {/* 업체별 내부 홍보 페이지 연결 */}
 
                       <div className="companyActions">
-                        {website ? (
-                          <a
-                            href={website}
-                            className="primaryButton"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            업체 상세보기
-                          </a>
-                        ) : (
-                          <Link
-                            href={`/companies/${company.id}`}
-                            className="primaryButton"
-                          >
-                            업체 상세보기
-                          </Link>
-                        )}
+                        <Link
+                          href={`/companies/${encodeURIComponent(
+                            company.id
+                          )}`}
+                          className="primaryButton"
+                        >
+                          업체 상세보기
+                        </Link>
 
                         {company.phone && (
                           <a
