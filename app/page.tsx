@@ -20,9 +20,6 @@ import Footer from "./Footer";
    이지종합건설 기존 설정
 ===================================== */
 
-const EASY_HOMECARE_URL =
-  "https://easyhomecare.vercel.app/";
-
 const EASY_HOMECARE_IMAGE =
   "/IMG_0778.png";
 
@@ -40,9 +37,6 @@ const SUPABASE_KEY =
 
 /* =====================================
    업체 데이터 타입
-
-   기존 Company 타입은 유지하고
-   홈페이지 주소만 추가합니다.
 ===================================== */
 
 type CompanyWithWebsite = Company & {
@@ -58,6 +52,11 @@ type CompanyRow = {
   services: string[] | null;
   images: string[] | null;
   website_url: string | null;
+};
+
+type PopularKeyword = {
+  keyword: string;
+  search_count: number;
 };
 
 function toCompany(
@@ -95,65 +94,6 @@ function isEasyHomecare(
 }
 
 /* =====================================
-   홈페이지 주소 안전하게 확인
-
-   - https:// 및 http:// 주소만 허용
-   - 주소가 없거나 잘못된 경우 null 반환
-===================================== */
-
-function getSafeWebsiteUrl(
-  value: string | null
-): string | null {
-  if (!value?.trim()) {
-    return null;
-  }
-
-  try {
-    const url = new URL(value.trim());
-
-    if (
-      !["https:", "http:"].includes(
-        url.protocol
-      ) ||
-      !url.hostname.includes(".") ||
-      url.username ||
-      url.password
-    ) {
-      return null;
-    }
-
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
-
-/* =====================================
-   업체별 홈페이지 자동 연결
-
-   1. 등록된 홈페이지 주소 우선
-   2. 기존 이지종합건설 주소 유지
-   3. 홈페이지가 없으면 내부 상세페이지
-===================================== */
-
-function getCompanyWebsite(
-  company: CompanyWithWebsite
-): string | null {
-  const registeredWebsite =
-    getSafeWebsiteUrl(company.website_url);
-
-  if (registeredWebsite) {
-    return registeredWebsite;
-  }
-
-  if (isEasyHomecare(company)) {
-    return EASY_HOMECARE_URL;
-  }
-
-  return null;
-}
-
-/* =====================================
    업체별 대표 이미지
 ===================================== */
 
@@ -172,7 +112,22 @@ function getCompanyImage(
 }
 
 /* =====================================
+   검색어 정리
+===================================== */
+
+function normalizeKeyword(
+  value: string
+): string {
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+/* =====================================
    시공 종류별 이미지
+
+   기존 이미지 주소 그대로 유지
 ===================================== */
 
 const serviceImages: Record<string, string> = {
@@ -223,10 +178,29 @@ export default function Home() {
 
   const [region, setRegion] = useState("");
   const [service, setService] = useState("");
+
+  // 검색창 입력값
+  const [keywordInput, setKeywordInput] =
+    useState("");
+
+  // 실제 검색 결과에 적용된 키워드
   const [keyword, setKeyword] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  /* =====================================
+     인기 검색어 상태
+  ===================================== */
+
+  const [popularKeywords, setPopularKeywords] =
+    useState<PopularKeyword[]>([]);
+
+  const [popularLoading, setPopularLoading] =
+    useState(true);
+
+  const [popularError, setPopularError] =
+    useState("");
 
   /* =====================================
      승인 업체 불러오기
@@ -240,6 +214,7 @@ export default function Home() {
       setError(
         "업체 검색 설정을 확인할 수 없습니다."
       );
+
       setLoading(false);
       return;
     }
@@ -286,18 +261,177 @@ export default function Home() {
     }
   }, []);
 
+  /* =====================================
+     인기 검색어 TOP 10 불러오기
+  ===================================== */
+
+  const loadPopularKeywords =
+    useCallback(async () => {
+      setPopularLoading(true);
+      setPopularError("");
+
+      if (!SUPABASE_URL || !SUPABASE_KEY) {
+        setPopularError(
+          "인기 검색어 연결 설정을 확인할 수 없습니다."
+        );
+
+        setPopularLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/rpc/get_popular_keywords`,
+          {
+            method: "POST",
+            headers: {
+              apikey: SUPABASE_KEY,
+              Authorization: `Bearer ${SUPABASE_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({}),
+            cache: "no-store",
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `인기 검색어를 불러오지 못했습니다. (${response.status})`
+          );
+        }
+
+        const rows: unknown =
+          await response.json();
+
+        if (!Array.isArray(rows)) {
+          throw new Error(
+            "인기 검색어 응답 형식이 올바르지 않습니다."
+          );
+        }
+
+        const validRows = (
+          rows as PopularKeyword[]
+        ).filter(
+          (item) =>
+            typeof item.keyword === "string" &&
+            typeof item.search_count === "number"
+        );
+
+        setPopularKeywords(validRows);
+      } catch (err) {
+        setPopularError(
+          err instanceof Error
+            ? err.message
+            : "인기 검색어를 불러오지 못했습니다."
+        );
+      } finally {
+        setPopularLoading(false);
+      }
+    }, []);
+
+  /* =====================================
+     최초 데이터 불러오기
+  ===================================== */
+
   useEffect(() => {
     void loadCompanies();
-  }, [loadCompanies]);
+    void loadPopularKeywords();
+  }, [
+    loadCompanies,
+    loadPopularKeywords,
+  ]);
+
+  /* =====================================
+     검색어 기록
+
+     검색 버튼을 누르거나 인기 검색어를
+     클릭했을 때만 기록합니다.
+  ===================================== */
+
+  const recordKeyword = useCallback(
+    async (value: string) => {
+      const normalized =
+        normalizeKeyword(value);
+
+      if (
+        normalized.length < 2 ||
+        normalized.length > 50 ||
+        !SUPABASE_URL ||
+        !SUPABASE_KEY
+      ) {
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/rpc/record_search_keyword`,
+          {
+            method: "POST",
+            headers: {
+              apikey: SUPABASE_KEY,
+              Authorization: `Bearer ${SUPABASE_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              p_keyword: normalized,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `검색어 저장 실패 (${response.status})`
+          );
+        }
+
+        await loadPopularKeywords();
+      } catch (err) {
+        // 기록 오류가 발생해도 업체 검색은 유지
+        console.error(
+          "검색어 기록 오류:",
+          err
+        );
+      }
+    },
+    [loadPopularKeywords]
+  );
+
+  /* =====================================
+     검색 결과 위치로 이동
+  ===================================== */
+
+  function scrollToResults() {
+    document
+      .getElementById("results")
+      ?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+  }
+
+  /* =====================================
+     검색 실행
+  ===================================== */
+
+  function runSearch(value: string) {
+    const normalized =
+      normalizeKeyword(value);
+
+    setKeywordInput(value);
+    setKeyword(normalized);
+
+    if (normalized) {
+      void recordKeyword(normalized);
+    }
+
+    scrollToResults();
+  }
 
   /* =====================================
      업체 검색
   ===================================== */
 
   const filtered = useMemo(() => {
-    const normalizedKeyword =
-      keyword.trim().toLowerCase();
-
     return companies.filter((company) => {
       const matchRegion =
         !region ||
@@ -317,10 +451,8 @@ export default function Home() {
         .toLowerCase();
 
       const matchKeyword =
-        !normalizedKeyword ||
-        searchableText.includes(
-          normalizedKeyword
-        );
+        !keyword ||
+        searchableText.includes(keyword);
 
       return (
         matchRegion &&
@@ -328,15 +460,12 @@ export default function Home() {
         matchKeyword
       );
     });
-  }, [companies, region, service, keyword]);
-
-  function scrollToResults() {
-    document
-      .getElementById("results")
-      ?.scrollIntoView({
-        behavior: "smooth",
-      });
-  }
+  }, [
+    companies,
+    region,
+    service,
+    keyword,
+  ]);
 
   /* =====================================
      화면
@@ -381,7 +510,14 @@ export default function Home() {
             원하는 집수리 업체를 찾아볼 수 있습니다.
           </p>
 
-          <div className="searchBox">
+          <form
+            className="searchBox"
+            onSubmit={(event) => {
+              event.preventDefault();
+
+              runSearch(keywordInput);
+            }}
+          >
             <select
               value={region}
               onChange={(event) =>
@@ -406,15 +542,12 @@ export default function Home() {
             <input
               type="search"
               placeholder="업체명 또는 시공 키워드"
-              value={keyword}
+              value={keywordInput}
               onChange={(event) =>
-                setKeyword(event.target.value)
+                setKeywordInput(event.target.value)
               }
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  scrollToResults();
-                }
-              }}
+              aria-label="업체명 또는 시공 키워드"
+              maxLength={50}
             />
 
             <select
@@ -439,12 +572,203 @@ export default function Home() {
             </select>
 
             <button
-              type="button"
-              onClick={scrollToResults}
+              type="submit"
               className="primaryButton"
             >
               업체 검색하기
             </button>
+          </form>
+        </div>
+      </section>
+
+      {/* =====================================
+         메인 인기 검색어 TOP 10
+      ===================================== */}
+
+      <section className="section container">
+        <div
+          style={{
+            padding: "22px",
+            border: "1px solid #e5e7eb",
+            borderRadius: "18px",
+            background: "#ffffff",
+            boxShadow:
+              "0 4px 18px rgba(15, 23, 42, 0.05)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "10px",
+              marginBottom: "8px",
+            }}
+          >
+            <h2
+              style={{
+                margin: 0,
+                fontSize: "22px",
+                color: "#111827",
+              }}
+            >
+              🔥 인기 검색어 TOP 10
+            </h2>
+
+            <span
+              style={{
+                padding: "6px 10px",
+                borderRadius: "999px",
+                background: "#fff7ed",
+                color: "#c2410c",
+                fontSize: "12px",
+                fontWeight: 700,
+              }}
+            >
+              최근 30일
+            </span>
+          </div>
+
+          <p
+            style={{
+              marginTop: "8px",
+              marginBottom: "20px",
+              color: "#6b7280",
+              fontSize: "14px",
+              lineHeight: 1.6,
+            }}
+          >
+            집수리모아에서 실제로 검색된
+            키워드 순위입니다. 검색어를 누르면
+            관련 업체를 바로 찾아볼 수 있습니다.
+          </p>
+
+          {popularLoading ? (
+            <div className="emptyBox">
+              인기 검색어를 불러오는 중입니다...
+            </div>
+          ) : popularError ? (
+            <div
+              className="emptyBox"
+              role="alert"
+              style={{
+                color: "#b91c1c",
+              }}
+            >
+              <p>{popularError}</p>
+
+              <button
+                type="button"
+                className="outlineButton"
+                onClick={() => {
+                  void loadPopularKeywords();
+                }}
+              >
+                다시 불러오기
+              </button>
+            </div>
+          ) : popularKeywords.length === 0 ? (
+            <div className="emptyBox">
+              아직 집계된 검색어가 없습니다.
+              위 검색창에서 첫 검색을 해보세요!
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+                gap: "10px",
+              }}
+            >
+              {popularKeywords.map(
+                (item, index) => (
+                  <button
+                    key={item.keyword}
+                    type="button"
+                    onClick={() => {
+                      setRegion("");
+                      setService("");
+
+                      runSearch(item.keyword);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent:
+                        "space-between",
+                      gap: "12px",
+                      width: "100%",
+                      padding: "14px 16px",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "12px",
+                      background: "#ffffff",
+                      color: "#111827",
+                      textAlign: "left",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        minWidth: 0,
+                      }}
+                    >
+                      <strong
+                        style={{
+                          minWidth: "24px",
+                          color:
+                            index < 3
+                              ? "#ea580c"
+                              : "#6b7280",
+                          fontSize: "17px",
+                        }}
+                      >
+                        {index + 1}
+                      </strong>
+
+                      <span
+                        style={{
+                          overflowWrap:
+                            "anywhere",
+                          fontSize: "15px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {item.keyword}
+                      </span>
+                    </span>
+
+                    <span
+                      style={{
+                        flexShrink: 0,
+                        fontSize: "13px",
+                        color: "#6b7280",
+                      }}
+                    >
+                      {item.search_count}회
+                    </span>
+                  </button>
+                )
+              )}
+            </div>
+          )}
+
+          <div
+            style={{
+              marginTop: "20px",
+              textAlign: "right",
+            }}
+          >
+            <Link
+              href="/companies"
+              className="outlineButton"
+            >
+              전체 업체 찾아보기 →
+            </Link>
           </div>
         </div>
       </section>
@@ -574,9 +898,6 @@ export default function Home() {
           <>
             <div className="companyGrid">
               {filtered.map((company) => {
-                const website =
-                  getCompanyWebsite(company);
-
                 const companyImage =
                   getCompanyImage(company);
 
@@ -638,30 +959,24 @@ export default function Home() {
                         </span>
                       </div>
 
-                      {/* 상세보기 및 전화 문의 */}
+                      {/* 내부 홍보 페이지 및 전화 문의 */}
 
                       <div className="companyActions">
-                        {website ? (
-                          <a
-                            href={website}
-                            className="outlineButton"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            상세보기
-                          </a>
-                        ) : (
-                          <Link
-                            href={`/companies/${company.id}`}
-                            className="outlineButton"
-                          >
-                            상세보기
-                          </Link>
-                        )}
+                        <Link
+                          href={`/companies/${encodeURIComponent(
+                            company.id
+                          )}`}
+                          className="outlineButton"
+                        >
+                          상세보기
+                        </Link>
 
                         {company.phone && (
                           <a
-                            href={`tel:${company.phone}`}
+                            href={`tel:${company.phone.replace(
+                              /[^\d+]/g,
+                              ""
+                            )}`}
                             className="primaryButton"
                           >
                             📞 전화 문의
