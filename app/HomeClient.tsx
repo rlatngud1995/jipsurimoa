@@ -566,19 +566,24 @@ function servesSelectedRegion(
 
 /* =====================================
    시공 종류별 실제 시공 사진
+
+   수전·펫도어: 보내준 GitHub 사진 사용
+   철거·원상복구: 별도 사진 등록 전까지
+   잘못된 냉장고 철거 사진 대신 기본 표시
 ===================================== */
 
 const serviceImages: Record<string, string> = {
   "종합 집수리": "/IMG_3406.jpeg",
   "싱크볼 리폼": "/IMG_1096.jpeg",
   "쿡탑 설치": "/IMG_2972.jpeg",
-  "철거·원상복구": "/IMG_3095.jpeg",
+  "철거·원상복구": "",
   "벌목·조경": "/IMG_4137.jpeg",
   "욕실 수리": "/IMG_3510.jpeg",
   "전기·조명": "/IMG_3216.jpeg",
   "에어컨": "/IMG_2756.jpeg",
-  "수전 교체": "/IMG_3424.jpeg",
-  "펫도어 설치": "/IMG_3489.jpeg",
+  "수전 교체": "/IMG_0996.jpeg",
+  "펫도어 설치":
+    "/0F47B202-98EC-4C36-933A-61965565C971.png",
   "냉장고 철거": "/IMG_3095.jpeg",
   "기타 시공": "/IMG_3193.jpeg",
 };
@@ -1607,6 +1612,7 @@ export default function Home({
         <div className="serviceGrid">
           {services.map((item) => {
             const pageHref = SERVICE_PAGE_LINKS[item];
+            const serviceImage = serviceImages[item];
 
             const cardContent = (
               <>
@@ -1616,19 +1622,37 @@ export default function Home({
                     aspectRatio: "4 / 3",
                     overflow: "hidden",
                     background: "#eff6ff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
-                  <img
-                    src={serviceImages[item]}
-                    alt={`${item} 시공 예시`}
-                    loading="lazy"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      display: "block",
-                      objectFit: "cover",
-                    }}
-                  />
+                  {serviceImage ? (
+                    <img
+                      src={serviceImage}
+                      alt={`${item} 시공 예시`}
+                      loading="lazy"
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        display: "block",
+                        objectFit: "cover",
+                      }}
+                    />
+                  ) : (
+                    <span
+                      aria-label={`${item} 사진 준비 중`}
+                      style={{
+                        color: "#1d4ed8",
+                        fontSize: "15px",
+                        fontWeight: 800,
+                        textAlign: "center",
+                        padding: "12px",
+                      }}
+                    >
+                      🛠️ {item}
+                    </span>
+                  )}
                 </div>
 
                 <strong
