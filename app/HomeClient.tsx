@@ -233,13 +233,16 @@ const PROVINCES: Province[] = [
 
 /* =====================================
    업체 데이터 타입
+
+   서버에서 받아온 데이터를 기존 업체
+   목록의 초기 데이터로 사용
 ===================================== */
 
 type CompanyWithWebsite = Company & {
   website_url: string | null;
 };
 
-type CompanyRow = {
+export type HomeCompanyRow = {
   id: string;
   name: string | null;
   description: string | null;
@@ -255,8 +258,12 @@ type PopularKeyword = {
   search_count: number;
 };
 
+type HomeClientProps = {
+  initialCompanies?: HomeCompanyRow[] | null;
+};
+
 function toCompany(
-  row: CompanyRow
+  row: HomeCompanyRow
 ): CompanyWithWebsite {
   return {
     id: row.id,
@@ -349,6 +356,16 @@ function isCapitalArea(
   ].includes(compact(value));
 }
 
+function isCapitalProvince(
+  provinceName: string
+): boolean {
+  return [
+    "서울특별시",
+    "경기도",
+    "인천광역시",
+  ].includes(provinceName);
+}
+
 /* =====================================
    지역 문자열을 시·도와 비교
 ===================================== */
@@ -360,7 +377,7 @@ function regionStartsWithProvince(
   const value = compact(region);
 
   return province.aliases.some((alias) =>
-    value.startsWith(alias)
+    value.startsWith(compact(alias))
   );
 }
 
@@ -370,14 +387,16 @@ function isWholeProvince(
 ): boolean {
   const value = compact(region);
 
-  return province.aliases.some((alias) =>
-    [
-      alias,
-      `${alias}전체`,
-      `${alias}전지역`,
-      `${alias}전역`,
-    ].includes(value)
-  );
+  return province.aliases.some((alias) => {
+    const normalizedAlias = compact(alias);
+
+    return [
+      normalizedAlias,
+      `${normalizedAlias}전체`,
+      `${normalizedAlias}전지역`,
+      `${normalizedAlias}전역`,
+    ].includes(value);
+  });
 }
 
 /* =====================================
@@ -400,11 +419,7 @@ function servesProvince(
     }
 
     if (
-      [
-        "서울특별시",
-        "경기도",
-        "인천광역시",
-      ].includes(provinceName) &&
+      isCapitalProvince(provinceName) &&
       isCapitalArea(region)
     ) {
       return true;
@@ -445,31 +460,20 @@ function servesDistrict(
     }
 
     if (
-      [
-        "서울특별시",
-        "경기도",
-        "인천광역시",
-      ].includes(provinceName) &&
+      isCapitalProvince(provinceName) &&
       isCapitalArea(region)
     ) {
       return true;
     }
 
-    if (
-      !regionStartsWithProvince(
-        region,
-        province
-      )
-    ) {
+    if (!regionStartsWithProvince(region, province)) {
       return false;
     }
 
-    const matchedAlias = [
-      ...province.aliases,
-    ]
+    const matchedAlias = [...province.aliases]
       .sort((a, b) => b.length - a.length)
       .find((alias) =>
-        value.startsWith(alias)
+        value.startsWith(compact(alias))
       );
 
     if (!matchedAlias) {
@@ -477,48 +481,105 @@ function servesDistrict(
     }
 
     const remaining = value.slice(
-      matchedAlias.length
+      compact(matchedAlias).length
     );
 
     if (remaining === targetDistrict) {
       return true;
     }
 
-    return remaining.startsWith(
-      targetDistrict
-    );
+    return remaining.startsWith(targetDistrict);
   });
 }
 
 /* =====================================
-   시공 종류별 실제 시공 사진
+   상단 지역 검색도 같은 기준 사용
 
-   public 폴더에 업로드한 사진 사용
+   기존 regions 목록에 들어 있는
+   서울·경기·수도권·시군구 등을
+   업체 서비스 지역과 비교
+===================================== */
+
+function servesSelectedRegion(
+  company: CompanyWithWebsite,
+  selectedRegion: string
+): boolean {
+  const target = compact(selectedRegion);
+
+  if (!target || isNationwide(target)) {
+    return true;
+  }
+
+  if (isCapitalArea(target)) {
+    return company.regions.some((region) => {
+      if (
+        isNationwide(region) ||
+        isCapitalArea(region)
+      ) {
+        return true;
+      }
+
+      return PROVINCES
+        .filter((province) =>
+          isCapitalProvince(province.name)
+        )
+        .some((province) =>
+          regionStartsWithProvince(region, province)
+        );
+    });
+  }
+
+  for (const province of PROVINCES) {
+    if (
+      province.aliases.some(
+        (alias) => compact(alias) === target
+      )
+    ) {
+      return servesProvince(company, province.name);
+    }
+
+    for (const district of province.districts) {
+      const matchesDistrict =
+        target === compact(district) ||
+        province.aliases.some(
+          (alias) =>
+            target ===
+            `${compact(alias)}${compact(district)}`
+        );
+
+      if (matchesDistrict) {
+        return servesDistrict(
+          company,
+          province.name,
+          district
+        );
+      }
+    }
+  }
+
+  /* 기존 목록의 별도 지역명은
+     기존의 정확한 일치 방식도 유지 */
+  return company.regions.some(
+    (region) => compact(region) === target
+  );
+}
+
+/* =====================================
+   시공 종류별 실제 시공 사진
 ===================================== */
 
 const serviceImages: Record<string, string> = {
   "종합 집수리": "/IMG_3406.jpeg",
-
   "싱크볼 리폼": "/IMG_1096.jpeg",
-
   "쿡탑 설치": "/IMG_2972.jpeg",
-
   "철거·원상복구": "/IMG_3095.jpeg",
-
   "벌목·조경": "/IMG_4137.jpeg",
-
   "욕실 수리": "/IMG_3510.jpeg",
-
   "전기·조명": "/IMG_3216.jpeg",
-
   "에어컨": "/IMG_2756.jpeg",
-
   "수전 교체": "/IMG_3424.jpeg",
-
   "펫도어 설치": "/IMG_3489.jpeg",
-
   "냉장고 철거": "/IMG_3095.jpeg",
-
   "기타 시공": "/IMG_3193.jpeg",
 };
 
@@ -526,9 +587,16 @@ const serviceImages: Record<string, string> = {
    홈페이지
 ===================================== */
 
-export default function Home() {
+export default function Home({
+  initialCompanies = null,
+}: HomeClientProps) {
+  const hasInitialCompanies =
+    initialCompanies !== null;
+
   const [companies, setCompanies] =
-    useState<CompanyWithWebsite[]>([]);
+    useState<CompanyWithWebsite[]>(() =>
+      (initialCompanies ?? []).map(toCompany)
+    );
 
   const [region, setRegion] = useState("");
   const [service, setService] = useState("");
@@ -538,7 +606,10 @@ export default function Home() {
 
   const [keyword, setKeyword] = useState("");
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(
+    !hasInitialCompanies
+  );
+
   const [error, setError] = useState("");
 
   const [popularKeywords, setPopularKeywords] =
@@ -610,7 +681,10 @@ export default function Home() {
   }
 
   /* =====================================
-     승인 업체 불러오기
+     승인 업체 다시 불러오기
+
+     서버 초기 데이터가 없거나 사용자가
+     다시 불러오기를 누른 경우에 사용
   ===================================== */
 
   const loadCompanies = useCallback(async () => {
@@ -626,7 +700,7 @@ export default function Home() {
     }
 
     try {
-      const allRows: CompanyRow[] = [];
+      const allRows: HomeCompanyRow[] = [];
       const pageSize = 500;
       let offset = 0;
 
@@ -666,7 +740,8 @@ export default function Home() {
           );
         }
 
-        const pageRows = rows as CompanyRow[];
+        const pageRows =
+          rows as HomeCompanyRow[];
 
         allRows.push(...pageRows);
 
@@ -755,9 +830,18 @@ export default function Home() {
     }, []);
 
   useEffect(() => {
-    void loadCompanies();
+    /* 서버에서 업체 데이터를 받았다면
+       첫 화면에서 중복 요청하지 않음 */
+    if (!hasInitialCompanies) {
+      void loadCompanies();
+    }
+
     void loadPopularKeywords();
-  }, [loadCompanies, loadPopularKeywords]);
+  }, [
+    hasInitialCompanies,
+    loadCompanies,
+    loadPopularKeywords,
+  ]);
 
   /* =====================================
      검색어 기록
@@ -848,7 +932,7 @@ export default function Home() {
 
       const matchRegion =
         !region ||
-        company.regions.includes(region);
+        servesSelectedRegion(company, region);
 
       const matchService =
         !service ||
@@ -1608,6 +1692,8 @@ export default function Home() {
 
       {/* =====================================
          업체 검색 결과
+
+         기존 업체 목록 하나만 사용
       ===================================== */}
 
       <section
