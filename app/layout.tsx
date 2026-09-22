@@ -21,6 +21,16 @@ const SITE_DESCRIPTION =
   "전국 집수리 업체를 지역과 시공 종류별로 찾아보세요. 쿡탑 교체, 싱크볼 리폼, 벌목 등 업체 정보를 확인할 수 있습니다.";
 
 /* =====================================
+   링크 미리보기 대표 이미지
+
+   GitHub public 폴더에 업로드한
+   집수리모아 이미지 파일명
+===================================== */
+
+const OG_IMAGE =
+  "/E8D72AE4-157B-42E4-BBFC-A52615EB4A63.png";
+
+/* =====================================
    검색엔진 메타데이터
 ===================================== */
 
@@ -60,6 +70,10 @@ export const metadata: Metadata = {
     "냉장고 철거",
   ],
 
+  /* =====================================
+     문자·카카오톡 링크 미리보기
+  ===================================== */
+
   openGraph: {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
@@ -67,12 +81,23 @@ export const metadata: Metadata = {
     siteName: SITE_NAME,
     locale: "ko_KR",
     type: "website",
+
+    images: [
+      {
+        url: OG_IMAGE,
+        width: 1536,
+        height: 1024,
+        alt: "집수리모아 대표 이미지",
+        type: "image/png",
+      },
+    ],
   },
 
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
+    images: [OG_IMAGE],
   },
 
   robots: {
