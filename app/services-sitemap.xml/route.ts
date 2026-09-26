@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server";
 
 /* =========================================
@@ -8,10 +7,10 @@ import { NextResponse } from "next/server";
    app/services-sitemap.xml/route.ts
 
    생성 주소 예시:
-   /services/cooktop/seoul
-   /services/cooktop/seoul/gangnam
-   /services/cooktop/gyeonggi/ansan
-   /services/sink/gyeonggi/suwon
+   /services/plumbing/seoul
+   /services/plumbing/seoul/gangnam
+   /services/plumbing/gyeonggi/suwon
+   /services/plumbing/chungnam/cheonan
 
    시·도 및 시·군·구 주소는 영어로 통일
 ========================================= */
@@ -53,7 +52,7 @@ type Company = {
 /* =========================================
    서비스 카테고리
 
-   서비스 페이지 코드와 동일하게 설정
+   서비스 페이지와 동일한 13개 카테고리
 ========================================= */
 
 const SERVICES: Service[] = [
@@ -75,12 +74,42 @@ const SERVICES: Service[] = [
     ],
   },
   {
+    slug: "demolition",
+    matches: [
+      "철거",
+      "원상복구",
+      "폐기물",
+    ],
+  },
+  {
     slug: "tree",
     matches: [
       "벌목",
       "조경",
       "나무제거",
       "위험목",
+    ],
+  },
+  {
+    slug: "bathroom",
+    matches: [
+      "욕실",
+      "화장실",
+      "변기",
+      "세면대",
+      "샤워부스",
+      "욕조",
+    ],
+  },
+  {
+    slug: "electrical",
+    matches: [
+      "전기",
+      "조명",
+      "콘센트",
+      "스위치",
+      "차단기",
+      "실링팬",
     ],
   },
   {
@@ -91,6 +120,26 @@ const SERVICES: Service[] = [
     slug: "faucet",
     matches: ["수전"],
   },
+
+  /* 누수·수도설비 */
+  {
+    slug: "plumbing",
+    matches: [
+      "누수",
+      "누수탐지",
+      "누수공사",
+      "수도설비",
+      "수도배관",
+      "수도수리",
+      "수도공사",
+      "배관",
+      "배관수리",
+      "배관누수",
+      "수도관",
+      "수도관교체",
+    ],
+  },
+
   {
     slug: "petdoor",
     matches: ["펫도어"],
@@ -102,13 +151,19 @@ const SERVICES: Service[] = [
       "냉장고장철거",
     ],
   },
+  {
+    slug: "other",
+    matches: [
+      "기타 시공",
+      "기타시공",
+      "기타 집수리",
+      "기타집수리",
+    ],
+  },
 ];
 
 /* =========================================
    전국 지역별 영어 주소
-
-   서비스 페이지 코드와 동일한
-   영어 slug를 사용해야 함
 ========================================= */
 
 const REGIONS: Region[] = [
@@ -371,12 +426,6 @@ function matchesService(
 
 /* =========================================
    업체 지역 일치 여부
-
-   서울 전 지역 등록 업체:
-   서울 및 서울 25개 구에 표시
-
-   경기 안산시 등록 업체:
-   경기 및 안산시에 표시
 ========================================= */
 
 function getRegionRemainder(
@@ -531,11 +580,7 @@ export async function GET() {
       );
 
       /*
-        3. 등록 업체가 있는 시·군·구
-
-        해당 지역에서 해당 서비스를
-        제공하는 업체가 있을 때만
-        사이트맵에 추가
+        3. 등록 업체가 있는 시·군·구만 추가
       */
 
       for (
