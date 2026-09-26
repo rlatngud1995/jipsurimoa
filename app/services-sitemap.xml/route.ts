@@ -1,31 +1,36 @@
 import { NextResponse } from "next/server";
 
+import legalDongs from "../data/legal-dongs.json";
+
 /* =========================================
-   집수리모아 서비스별 지역 사이트맵
+   집수리모아 서비스별 전국 지역 사이트맵
 
    파일:
    app/services-sitemap.xml/route.ts
 
    생성 주소 예시:
-   /services/plumbing/seoul
-   /services/plumbing/seoul/gangnam
-   /services/plumbing/chungnam/cheonan
-   /services/plumbing/chungnam/cheonan/불당동
 
-   시·도 및 시·군·구 주소는 영어 slug 사용
-   읍·면·동은 등록된 실제 한글 지역명 사용
+   /services/sink/seoul
+   /services/sink/seoul/gangnam
+   /services/sink/seoul/gangnam/역삼동
+
+   /services/cooktop/chungnam
+   /services/cooktop/chungnam/cheonan
+   /services/cooktop/chungnam/cheonan/불당동
+
+   핵심:
+
+   업체 등록 여부와 관계없이
+
+   13개 카테고리
+   × 전국 시·도
+   × 전국 시·군·구
+   × 전체 읍·면·동
+
+   페이지 주소 생성
 ========================================= */
 
 const SITE_URL = "https://www.jipsurimoa.com";
-
-const SUPABASE_URL = (
-  process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
-)
-  .replace(/\/rest\/v1\/?$/, "")
-  .replace(/\/$/, "");
-
-const SUPABASE_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
 /* =========================================
    타입
@@ -48,10 +53,10 @@ type Region = {
   districts: string;
 };
 
-type Company = {
-  id: string | number;
-  regions: string[] | null;
-  services: string[] | null;
+type LegalDong = {
+  region: string;
+  district: string;
+  neighborhood: string;
 };
 
 /* =========================================
@@ -62,12 +67,21 @@ type Company = {
 const SERVICES: Service[] = [
   {
     slug: "repair",
-    matches: ["집수리", "종합수리"],
+    matches: [
+      "집수리",
+      "종합수리",
+    ],
   },
+
   {
     slug: "sink",
-    matches: ["싱크볼", "싱크대", "싱크"],
+    matches: [
+      "싱크볼",
+      "싱크대",
+      "싱크",
+    ],
   },
+
   {
     slug: "cooktop",
     matches: [
@@ -77,6 +91,7 @@ const SERVICES: Service[] = [
       "가스렌지",
     ],
   },
+
   {
     slug: "demolition",
     matches: [
@@ -85,6 +100,7 @@ const SERVICES: Service[] = [
       "폐기물",
     ],
   },
+
   {
     slug: "tree",
     matches: [
@@ -94,6 +110,7 @@ const SERVICES: Service[] = [
       "위험목",
     ],
   },
+
   {
     slug: "bathroom",
     matches: [
@@ -105,6 +122,7 @@ const SERVICES: Service[] = [
       "욕조",
     ],
   },
+
   {
     slug: "electrical",
     matches: [
@@ -116,14 +134,21 @@ const SERVICES: Service[] = [
       "실링팬",
     ],
   },
+
   {
     slug: "aircon",
-    matches: ["에어컨"],
+    matches: [
+      "에어컨",
+    ],
   },
+
   {
     slug: "faucet",
-    matches: ["수전"],
+    matches: [
+      "수전",
+    ],
   },
+
   {
     slug: "plumbing",
     matches: [
@@ -141,10 +166,14 @@ const SERVICES: Service[] = [
       "수도관교체",
     ],
   },
+
   {
     slug: "petdoor",
-    matches: ["펫도어"],
+    matches: [
+      "펫도어",
+    ],
   },
+
   {
     slug: "refrigerator",
     matches: [
@@ -152,6 +181,7 @@ const SERVICES: Service[] = [
       "냉장고장철거",
     ],
   },
+
   {
     slug: "other",
     matches: [
@@ -369,11 +399,17 @@ const REGIONS: Region[] = [
    공통 함수
 ========================================= */
 
-function normalize(value: string): string {
+function normalize(
+  value: string
+): string {
   return value
     .replace(/\s+/g, "")
     .trim();
 }
+
+/* =========================================
+   시·군·구 변환
+========================================= */
 
 function getDistricts(
   region: Region
@@ -385,20 +421,25 @@ function getDistricts(
   return region.districts
     .split(",")
     .map((entry) => {
-      const [slug, name] =
-        entry.split(":");
+      const [
+        slug,
+        name,
+      ] = entry.split(":");
 
       return {
         slug,
         name,
       };
-    });
+    })
+    .filter(
+      (district) =>
+        district.slug &&
+        district.name
+    );
 }
 
 /* =========================================
    URL 생성
-
-   읍·면·동이 들어오면 encodeURIComponent 처리
 ========================================= */
 
 function makeUrl(
@@ -406,8 +447,11 @@ function makeUrl(
   location: string[] = []
 ): string {
   const encodedLocation =
-    location.map((value) =>
-      encodeURIComponent(value)
+    location.map(
+      (value) =>
+        encodeURIComponent(
+          value
+        )
     );
 
   const path = [
@@ -420,310 +464,6 @@ function makeUrl(
 }
 
 /* =========================================
-   승인 업체 조회
-========================================= */
-
-async function loadCompanies(): Promise<Company[]> {
-  if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.error(
-      "사이트맵: Supabase 환경변수가 없습니다."
-    );
-
-    return [];
-  }
-
-  const companies: Company[] = [];
-
-  const pageSize = 500;
-
-  try {
-    for (
-      let offset = 0;
-      ;
-      offset += pageSize
-    ) {
-      const params =
-        new URLSearchParams({
-          select:
-            "id,regions,services",
-          limit: String(pageSize),
-          offset: String(offset),
-        });
-
-      const response =
-        await fetch(
-          `${SUPABASE_URL}/rest/v1/approved_companies?${params.toString()}`,
-          {
-            headers: {
-              apikey:
-                SUPABASE_KEY,
-
-              Authorization:
-                `Bearer ${SUPABASE_KEY}`,
-            },
-
-            cache: "no-store",
-          }
-        );
-
-      if (!response.ok) {
-        console.error(
-          "사이트맵 업체 조회 실패:",
-          response.status
-        );
-
-        break;
-      }
-
-      const rows =
-        (await response.json()) as Company[];
-
-      companies.push(...rows);
-
-      if (
-        rows.length <
-        pageSize
-      ) {
-        break;
-      }
-    }
-  } catch (error) {
-    console.error(
-      "사이트맵 업체 조회 오류:",
-      error
-    );
-  }
-
-  return companies;
-}
-
-/* =========================================
-   업체 서비스 일치
-========================================= */
-
-function matchesService(
-  company: Company,
-  service: Service
-): boolean {
-  return (
-    company.services ?? []
-  ).some((registered) =>
-    service.matches.some(
-      (keyword) =>
-        normalize(
-          registered
-        ).includes(
-          normalize(keyword)
-        )
-    )
-  );
-}
-
-/* =========================================
-   등록 지역에서 시·도 이후 문자열 추출
-========================================= */
-
-function getRegionRemainder(
-  registered: string,
-  region: Region
-): string | null {
-  const value =
-    normalize(registered);
-
-  const alias =
-    [...region.aliases]
-      .sort(
-        (a, b) =>
-          b.length -
-          a.length
-      )
-      .find((name) =>
-        value.startsWith(
-          normalize(name)
-        )
-      );
-
-  if (!alias) {
-    return null;
-  }
-
-  return value.slice(
-    normalize(alias).length
-  );
-}
-
-/* =========================================
-   전체 지역 표현
-========================================= */
-
-function isWholeArea(
-  value: string
-): boolean {
-  return [
-    "",
-    "전체",
-    "전지역",
-    "전역",
-  ].includes(value);
-}
-
-/* =========================================
-   지역 업체 일치
-========================================= */
-
-function matchesRegion(
-  company: Company,
-  region: Region,
-  district?: District
-): boolean {
-  return (
-    company.regions ?? []
-  ).some((registered) => {
-    const value =
-      normalize(registered);
-
-    if (
-      [
-        "전국",
-        "전국전체",
-        "전국전지역",
-      ].includes(value)
-    ) {
-      return true;
-    }
-
-    if (
-      [
-        "seoul",
-        "gyeonggi",
-        "incheon",
-      ].includes(
-        region.slug
-      ) &&
-      [
-        "수도권",
-        "수도권전체",
-        "수도권전지역",
-      ].includes(value)
-    ) {
-      return true;
-    }
-
-    const remainder =
-      getRegionRemainder(
-        registered,
-        region
-      );
-
-    if (
-      remainder === null
-    ) {
-      return false;
-    }
-
-    if (
-      isWholeArea(
-        remainder
-      )
-    ) {
-      return true;
-    }
-
-    if (!district) {
-      return true;
-    }
-
-    return remainder.startsWith(
-      normalize(
-        district.name
-      )
-    );
-  });
-}
-
-/* =========================================
-   업체 데이터에서 읍·면·동 추출
-
-   예:
-   충남 천안시 불당동
-   → 불당동
-
-   충청남도천안시쌍용2동
-   → 쌍용2동
-========================================= */
-
-function getNeighborhoods(
-  companies: Company[],
-  region: Region,
-  district: District
-): string[] {
-  const neighborhoods =
-    new Set<string>();
-
-  const districtName =
-    normalize(
-      district.name
-    );
-
-  for (
-    const company of companies
-  ) {
-    for (
-      const registered of
-      company.regions ?? []
-    ) {
-      const remainder =
-        getRegionRemainder(
-          registered,
-          region
-        );
-
-      if (
-        remainder === null
-      ) {
-        continue;
-      }
-
-      if (
-        !remainder.startsWith(
-          districtName
-        )
-      ) {
-        continue;
-      }
-
-      const afterDistrict =
-        remainder.slice(
-          districtName.length
-        );
-
-      /*
-        정확한 읍·면·동 이름만 사이트맵에 추가
-      */
-
-      if (
-        /^[가-힣0-9·]+(?:동|읍|면)$/.test(
-          afterDistrict
-        )
-      ) {
-        neighborhoods.add(
-          afterDistrict
-        );
-      }
-    }
-  }
-
-  return [
-    ...neighborhoods,
-  ].sort((a, b) =>
-    a.localeCompare(
-      b,
-      "ko"
-    )
-  );
-}
-
-/* =========================================
    XML 특수문자 처리
 ========================================= */
 
@@ -731,11 +471,196 @@ function escapeXml(
   value: string
 ): string {
   return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+    .replace(
+      /</g,
+      "&lt;"
+    )
+    .replace(
+      />/g,
+      "&gt;"
+    )
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+    .replace(
+      /'/g,
+      "&apos;"
+    );
+}
+
+/* =========================================
+   지역 이름 일치 확인
+========================================= */
+
+function matchesRegionName(
+  legalRegion: string,
+  region: Region
+): boolean {
+  const value =
+    normalize(
+      legalRegion
+    );
+
+  return [
+    region.name,
+    ...region.aliases,
+  ].some(
+    (alias) =>
+      value ===
+      normalize(
+        alias
+      )
+  );
+}
+
+/* =========================================
+   공식 데이터에서 읍·면·동 조회
+
+   예:
+   {
+     region: "충청남도",
+     district: "천안시",
+     neighborhood: "불당동"
+   }
+
+   → 불당동 반환
+========================================= */
+
+function getOfficialNeighborhoods(
+  region: Region,
+  district: District
+): string[] {
+  const neighborhoods =
+    new Set<string>();
+
+  for (
+    const row of
+    legalDongs as LegalDong[]
+  ) {
+    if (
+      !matchesRegionName(
+        row.region,
+        region
+      )
+    ) {
+      continue;
+    }
+
+    if (
+      normalize(
+        row.district
+      ) !==
+      normalize(
+        district.name
+      )
+    ) {
+      continue;
+    }
+
+    const neighborhood =
+      row.neighborhood?.trim();
+
+    if (
+      !neighborhood
+    ) {
+      continue;
+    }
+
+    /*
+      읍·면·동만 등록
+
+      리 단위는 제외
+    */
+
+    if (
+      !/(동|읍|면)$/.test(
+        neighborhood
+      )
+    ) {
+      continue;
+    }
+
+    neighborhoods.add(
+      neighborhood
+    );
+  }
+
+  return [
+    ...neighborhoods,
+  ].sort(
+    (a, b) =>
+      a.localeCompare(
+        b,
+        "ko"
+      )
+  );
+}
+
+/* =========================================
+   세종특별자치시 읍·면·동 조회
+
+   세종은 일반적인 시·군·구 단계가 없음
+========================================= */
+
+function getSejongNeighborhoods(): string[] {
+  const neighborhoods =
+    new Set<string>();
+
+  for (
+    const row of
+    legalDongs as LegalDong[]
+  ) {
+    const isSejong =
+      [
+        "세종",
+        "세종시",
+        "세종특별자치시",
+      ].includes(
+        row.region
+      );
+
+    if (
+      !isSejong
+    ) {
+      continue;
+    }
+
+    const neighborhood =
+      row.neighborhood?.trim();
+
+    if (
+      !neighborhood
+    ) {
+      continue;
+    }
+
+    if (
+      !/(동|읍|면)$/.test(
+        neighborhood
+      )
+    ) {
+      continue;
+    }
+
+    neighborhoods.add(
+      neighborhood
+    );
+  }
+
+  return [
+    ...neighborhoods,
+  ].sort(
+    (a, b) =>
+      a.localeCompare(
+        b,
+        "ko"
+      )
+  );
 }
 
 /* =========================================
@@ -743,23 +668,23 @@ function escapeXml(
 ========================================= */
 
 export async function GET() {
-  const companies =
-    await loadCompanies();
-
-  /*
-    중복 URL 자동 제거
-  */
-
   const urls =
     new Set<string>();
+
+  /* =====================================
+     모든 13개 카테고리
+  ===================================== */
 
   for (
     const service of
     SERVICES
   ) {
-    /* =====================================
-       1. 카테고리 기본 페이지
-    ===================================== */
+    /* ===================================
+       1.
+       서비스 기본 주소
+
+       /services/sink
+    =================================== */
 
     urls.add(
       makeUrl(
@@ -767,30 +692,19 @@ export async function GET() {
       )
     );
 
-    /*
-      현재 서비스와 일치하는 승인 업체만 추출
-    */
-
-    const serviceCompanies =
-      companies.filter(
-        (company) =>
-          matchesService(
-            company,
-            service
-          )
-      );
-
-    /* =====================================
-       2. 전국 시·도 페이지
-
-       기존 동작 유지:
-       업체 유무와 관계없이 17개 시·도 생성
-    ===================================== */
+    /* ===================================
+       2.
+       전국 시·도
+    =================================== */
 
     for (
       const region of
       REGIONS
     ) {
+      /*
+        /services/sink/chungnam
+      */
+
       urls.add(
         makeUrl(
           service.slug,
@@ -800,37 +714,57 @@ export async function GET() {
         )
       );
 
-      /* ===================================
-         3. 시·군·구
+      /* =================================
+         세종특별자치시
 
-         해당 서비스 업체가 있는 지역만 생성
-      =================================== */
+         시·군·구 단계 없이
+         읍·면·동 바로 생성
+      ================================= */
+
+      if (
+        region.slug ===
+        "sejong"
+      ) {
+        const sejongNeighborhoods =
+          getSejongNeighborhoods();
+
+        for (
+          const neighborhood of
+          sejongNeighborhoods
+        ) {
+          urls.add(
+            makeUrl(
+              service.slug,
+              [
+                region.slug,
+                neighborhood,
+              ]
+            )
+          );
+        }
+
+        continue;
+      }
+
+      /* =================================
+         3.
+         모든 시·군·구
+      ================================= */
+
+      const districts =
+        getDistricts(
+          region
+        );
 
       for (
         const district of
-        getDistricts(
-          region
-        )
+        districts
       ) {
-        const districtCompanies =
-          serviceCompanies.filter(
-            (company) =>
-              matchesRegion(
-                company,
-                region,
-                district
-              )
-          );
-
-        if (
-          districtCompanies.length ===
-          0
-        ) {
-          continue;
-        }
-
         /*
-          시·군·구 URL
+          업체가 없어도 무조건 생성
+
+          예:
+          /services/sink/chungnam/cheonan
         */
 
         urls.add(
@@ -843,16 +777,14 @@ export async function GET() {
           )
         );
 
-        /* =================================
-           4. 읍·면·동
-
-           해당 서비스 업체가 실제 등록한
-           읍·면·동만 사이트맵에 추가
-        ================================= */
+        /* ===============================
+           4.
+           공식 법정동 데이터의
+           모든 읍·면·동
+        =============================== */
 
         const neighborhoods =
-          getNeighborhoods(
-            serviceCompanies,
+          getOfficialNeighborhoods(
             region,
             district
           );
@@ -861,6 +793,16 @@ export async function GET() {
           const neighborhood of
           neighborhoods
         ) {
+          /*
+            예:
+
+            /services/sink/chungnam/cheonan/불당동
+
+            /services/cooktop/seoul/gangnam/역삼동
+
+            /services/tree/gyeonggi/suwon/인계동
+          */
+
           urls.add(
             makeUrl(
               service.slug,
@@ -885,7 +827,9 @@ export async function GET() {
 
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
 
-    ...[...urls].map(
+    ...[
+      ...urls,
+    ].map(
       (url) =>
         `  <url><loc>${escapeXml(
           url
