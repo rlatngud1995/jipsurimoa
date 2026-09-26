@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -41,6 +40,10 @@ const SERVICE_PAGE_LINKS: Record<string, string> = {
   "전기·조명": "/services/electrical",
   "에어컨": "/services/aircon",
   "수전 교체": "/services/faucet",
+
+  // 새로 추가
+  "누수·수도설비": "/services/plumbing",
+
   "펫도어 설치": "/services/petdoor",
   "냉장고 철거": "/services/refrigerator",
   "기타 시공": "/services/other",
@@ -573,7 +576,12 @@ const serviceImages: Record<string, string> = {
   "전기·조명": "/IMG_3216.jpeg",
   "에어컨": "/IMG_2756.jpeg",
   "수전 교체": "/IMG_0996.jpeg",
-  "펫도어 설치": "/0F47B202-98EC-4C36-933A-61965565C971.png",
+
+  // 누수·수도설비 전용 사진 업로드 전까지 임시 사용
+  "누수·수도설비": "/IMG_0996.jpeg",
+
+  "펫도어 설치":
+    "/0F47B202-98EC-4C36-933A-61965565C971.png",
   "냉장고 철거": "/IMG_3095.jpeg",
   "기타 시공": "/IMG_3193.jpeg",
 };
@@ -1581,7 +1589,6 @@ export default function Home({
 
       {/* =====================================
          시공 종류별 카테고리
-
          모든 카테고리를 상세페이지로 연결
       ===================================== */}
 
@@ -1600,7 +1607,10 @@ export default function Home({
           {services.map((item) => (
             <Link
               key={item}
-              href={SERVICE_PAGE_LINKS[item] ?? "/companies"}
+              href={
+                SERVICE_PAGE_LINKS[item] ??
+                "/companies"
+              }
               className="serviceCard"
               style={{
                 padding: 0,
@@ -1757,15 +1767,19 @@ export default function Home({
 
                       <h3>{company.name}</h3>
 
-                      <p>{company.description}</p>
+                      <p>
+                        {company.description}
+                      </p>
 
                       <div className="companyInfo">
                         <span>
-                          📍 {company.regions.join(", ")}
+                          📍{" "}
+                          {company.regions.join(", ")}
                         </span>
 
                         <span>
-                          🛠️ {company.services.join(", ")}
+                          🛠️{" "}
+                          {company.services.join(", ")}
                         </span>
                       </div>
 
