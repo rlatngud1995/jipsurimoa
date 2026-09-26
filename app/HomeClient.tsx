@@ -40,10 +40,7 @@ const SERVICE_PAGE_LINKS: Record<string, string> = {
   "전기·조명": "/services/electrical",
   "에어컨": "/services/aircon",
   "수전 교체": "/services/faucet",
-
-  // 새로 추가
   "누수·수도설비": "/services/plumbing",
-
   "펫도어 설치": "/services/petdoor",
   "냉장고 철거": "/services/refrigerator",
   "기타 시공": "/services/other",
@@ -577,8 +574,8 @@ const serviceImages: Record<string, string> = {
   "에어컨": "/IMG_2756.jpeg",
   "수전 교체": "/IMG_0996.jpeg",
 
-  // 누수·수도설비 전용 사진 업로드 전까지 임시 사용
-  "누수·수도설비": "/IMG_0996.jpeg",
+  // 누수·수도설비 대표사진
+  "누수·수도설비": "/Resized_20260916_140832.jpeg",
 
   "펫도어 설치":
     "/0F47B202-98EC-4C36-933A-61965565C971.png",
@@ -623,10 +620,6 @@ export default function Home({
 
   const [popularError, setPopularError] =
     useState("");
-
-  /* =====================================
-     전국 지역 선택 상태
-  ===================================== */
 
   const [selectedProvince, setSelectedProvince] =
     useState("");
@@ -682,10 +675,6 @@ export default function Home({
     setKeywordInput("");
     scrollToResults();
   }
-
-  /* =====================================
-     승인 업체 다시 불러오기
-  ===================================== */
 
   const loadCompanies = useCallback(async () => {
     setLoading(true);
@@ -764,10 +753,6 @@ export default function Home({
     }
   }, []);
 
-  /* =====================================
-     인기 검색어 불러오기
-  ===================================== */
-
   const loadPopularKeywords =
     useCallback(async () => {
       setPopularLoading(true);
@@ -841,10 +826,6 @@ export default function Home({
     loadPopularKeywords,
   ]);
 
-  /* =====================================
-     검색어 기록
-  ===================================== */
-
   const recordKeyword = useCallback(
     async (value: string) => {
       const normalized =
@@ -889,10 +870,6 @@ export default function Home({
     [loadPopularKeywords]
   );
 
-  /* =====================================
-     검색 실행
-  ===================================== */
-
   function runSearch(value: string) {
     const normalized =
       normalizeKeyword(value);
@@ -906,10 +883,6 @@ export default function Home({
 
     scrollToResults();
   }
-
-  /* =====================================
-     업체 필터링
-  ===================================== */
 
   const filtered = useMemo(() => {
     return companies.filter((company) => {
@@ -965,14 +938,8 @@ export default function Home({
     keyword,
   ]);
 
-  /* =====================================
-     화면
-  ===================================== */
-
   return (
     <main>
-      {/* 상단 메뉴 */}
-
       <header className="header">
         <Link href="/" className="logo">
           🏠 집수리모아
@@ -1013,8 +980,6 @@ export default function Home({
         </nav>
       </header>
 
-      {/* 메인 검색 화면 */}
-
       <section className="hero">
         <div className="container">
           <span className="heroBadge">
@@ -1053,10 +1018,7 @@ export default function Home({
               </option>
 
               {regions.map((item) => (
-                <option
-                  key={item}
-                  value={item}
-                >
+                <option key={item} value={item}>
                   {item}
                 </option>
               ))}
@@ -1085,10 +1047,7 @@ export default function Home({
               </option>
 
               {services.map((item) => (
-                <option
-                  key={item}
-                  value={item}
-                >
+                <option key={item} value={item}>
                   {item}
                 </option>
               ))}
@@ -1122,10 +1081,6 @@ export default function Home({
           </button>
         </div>
       </section>
-
-      {/* =====================================
-         전국 지역별 업체 찾기
-      ===================================== */}
 
       <section
         id="region-finder"
@@ -1397,10 +1352,6 @@ export default function Home({
         </div>
       </section>
 
-      {/* =====================================
-         인기 검색어 TOP 10
-      ===================================== */}
-
       <section className="section container">
         <div
           style={{
@@ -1587,11 +1538,6 @@ export default function Home({
         </div>
       </section>
 
-      {/* =====================================
-         시공 종류별 카테고리
-         모든 카테고리를 상세페이지로 연결
-      ===================================== */}
-
       <section className="section container">
         <div className="sectionTitle">
           <h2>
@@ -1658,10 +1604,6 @@ export default function Home({
           ))}
         </div>
       </section>
-
-      {/* =====================================
-         업체 검색 결과
-      ===================================== */}
 
       <section
         id="results"
@@ -1827,8 +1769,6 @@ export default function Home({
           </div>
         )}
       </section>
-
-      {/* 업체 등록 안내 */}
 
       <section className="registerBanner">
         <div className="container">
