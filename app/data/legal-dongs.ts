@@ -4,82 +4,80 @@
    파일:
    app/data/legal-dongs.ts
 
-   데이터 출처:
-   행정표준코드관리시스템
-   https://www.code.go.kr
+   행정표준코드관리시스템(code.go.kr)
+   법정동 전체자료를 기반으로 생성된
+   공개 데이터에서 전국 지역을 읽는다.
 
-   기능:
-   - 공식 법정동 전체자료 ZIP 자동 다운로드
-   - EUC-KR TXT 자동 해석
-   - 폐지 지역 제외
-   - 읍 / 면 / 동만 추출
-   - 전국 법정동 자동 반환
+   기존 문제:
+   ZIP 내부 TXT 하나만 잘못 읽으면서
+   천안시에서 불당동 등 일부만 노출됨.
+
+   수정:
+   전국 시·도별 전체 데이터 읽기
+   → 시군구 구분
+   → 법정동 / 읍 / 면 전체 추출
 
    예:
-   서울특별시 종로구 청운동
-
-   경기도 수원시 장안구 파장동
-   → district = 수원시
-   → neighborhood = 파장동
-
    충청남도 천안시 서북구 불당동
-   → district = 천안시
-   → neighborhood = 불당동
+   → region: 충청남도
+   → district: 천안시
+   → neighborhood: 불당동
+
+   충청남도 천안시 동남구 대흥동
+   → district: 천안시
+   → neighborhood: 대흥동
+
+   경기도 수원시 팔달구 인계동
+   → district: 수원시
+   → neighborhood: 인계동
 ========================================= */
 
 export type LegalDong = {
-  code: string;
-
-  /*
-    예:
-    서울특별시
-    경기도
-    충청남도
-  */
   region: string;
-
-  /*
-    예:
-    종로구
-    수원시
-    천안시
-
-    수원시 장안구처럼
-    일반구가 있는 경우에도
-    집수리모아 기존 URL 구조에 맞춰
-    수원시까지만 district로 사용
-  */
   district: string;
-
-  /*
-    예:
-    청운동
-    불당동
-    조치원읍
-  */
   neighborhood: string;
-
-  /*
-    공식 전체 주소
-
-    예:
-    경기도 수원시 팔달구 인계동
-  */
   fullName: string;
 };
 
 /* =========================================
-   공식 법정동 전체자료 다운로드 주소
+   데이터 주소
+
+   이 저장소 데이터는
+   행정표준코드관리시스템
+   법정동코드 전체자료를 기반으로 생성됨
 ========================================= */
 
-const LEGAL_DONG_DOWNLOAD_URL =
-  "https://www.code.go.kr/etc/codeFullDown.do";
+const DATA_BASE_URL =
+  "https://raw.githubusercontent.com/wellsa-ai/admincode-kr/main/kr";
+
+/* =========================================
+   전국 시·도
+
+   기존 집수리모아 지역 구조와 맞춤
+========================================= */
+
+const REGION_FILES = [
+  "서울특별시",
+  "부산광역시",
+  "대구광역시",
+  "인천광역시",
+  "광주광역시",
+  "대전광역시",
+  "울산광역시",
+  "세종특별자치시",
+  "경기도",
+  "강원특별자치도",
+  "충청북도",
+  "충청남도",
+  "전북특별자치도",
+  "전라남도",
+  "경상북도",
+  "경상남도",
+  "제주특별자치도",
+] as const;
 
 /* =========================================
    메모리 캐시
-
-   같은 서버 인스턴스에서는
-   공식 데이터를 계속 다시 받지 않도록 함
 ========================================= */
 
 let memoryCache:
@@ -89,795 +87,453 @@ let memoryCache:
     }
   | null = null;
 
-/*
-  24시간
-*/
-
-const MEMORY_CACHE_TIME =
+const CACHE_TIME =
   1000 * 60 * 60 * 24;
 
 /* =========================================
-   ArrayBuffer → Uint8Array
+   문자열 정리
 ========================================= */
 
-function toBytes(
-  buffer: ArrayBuffer
-): Uint8Array {
-  return new Uint8Array(
-    buffer
-  );
+function clean(
+  value: string
+): string {
+  return value
+    .replace(/\r/g, "")
+    .trim();
 }
 
 /* =========================================
-   ZIP 숫자 읽기
+   시군구 헤더에서
+   집수리모아 기준 district 추출
+
+   예:
+
+   종로구
+   → 종로구
+
+   천안시 동남구
+   → 천안시
+
+   천안시 서북구
+   → 천안시
+
+   수원시 팔달구
+   → 수원시
+
+   고양시 일산동구
+   → 고양시
 ========================================= */
 
-function readUInt16LE(
-  bytes: Uint8Array,
-  offset: number
-): number {
-  return (
-    bytes[offset] |
-    (bytes[offset + 1] << 8)
-  );
-}
-
-function readUInt32LE(
-  bytes: Uint8Array,
-  offset: number
-): number {
-  return (
-    (
-      bytes[offset] |
-      (bytes[offset + 1] << 8) |
-      (bytes[offset + 2] << 16) |
-      (bytes[offset + 3] << 24)
-    ) >>>
-    0
-  );
-}
-
-/* =========================================
-   ZIP EOCD 찾기
-
-   ZIP 파일의 맨 뒤쪽에서
-   Central Directory 위치를 찾는다.
-========================================= */
-
-function findEndOfCentralDirectory(
-  bytes: Uint8Array
-): number {
-  /*
-    EOCD signature:
-
-    50 4B 05 06
-  */
-
-  const minimumLength = 22;
+function getMainDistrict(
+  heading: string
+): string {
+  const parts =
+    heading
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
 
   if (
-    bytes.length <
-    minimumLength
+    parts.length === 0
   ) {
-    return -1;
+    return "";
   }
 
   /*
-    ZIP comment 최대 길이 고려
+    첫 번째가 시/군이면
+    일반구가 뒤에 있더라도
+    첫 번째 시군을 사용
+
+    예:
+    수원시 팔달구
+    → 수원시
   */
 
-  const start =
-    Math.max(
-      0,
-      bytes.length -
-        65557
-    );
-
-  for (
-    let i =
-      bytes.length - 22;
-    i >= start;
-    i--
+  if (
+    /(?:시|군)$/.test(
+      parts[0]
+    )
   ) {
-    if (
-      bytes[i] === 0x50 &&
-      bytes[i + 1] === 0x4b &&
-      bytes[i + 2] === 0x05 &&
-      bytes[i + 3] === 0x06
-    ) {
-      return i;
-    }
+    return parts[0];
   }
 
-  return -1;
+  /*
+    서울 종로구,
+    부산 해운대구처럼
+    구 자체가 기초단위
+  */
+
+  return parts[0];
 }
 
 /* =========================================
-   ZIP 안의 TXT 파일 찾기
+   법정동 항목인지 확인
+
+   데이터 예:
+
+   불당동
+   성정동
+   직산읍
+   입장면
+   팔달로1가
+
+   아래는 제외:
+
+   직산읍 군동리
+   성거읍 저리
+   병천면 가전리
+
+   즉 "리" 하위 주소는 제외하고
+   읍면동/법정동 단위까지만 사용
 ========================================= */
 
-type ZipEntry = {
-  compressionMethod: number;
-  compressedSize: number;
-  uncompressedSize: number;
-  localHeaderOffset: number;
-};
+function isNeighborhoodItem(
+  value: string
+): boolean {
+  const text =
+    clean(value);
 
-function findTxtEntry(
-  bytes: Uint8Array
-): ZipEntry {
-  const eocdOffset =
-    findEndOfCentralDirectory(
-      bytes
-    );
+  if (!text) {
+    return false;
+  }
 
   if (
-    eocdOffset === -1
+    text.startsWith("(")
   ) {
-    throw new Error(
-      "법정동 ZIP 파일 구조를 확인할 수 없습니다."
-    );
+    return false;
   }
 
   /*
-    EOCD + 10:
-    전체 Central Directory entry 수
+    공백이 있다는 것은 대부분
+
+    성환읍 성환리
+    목천읍 신계리
+
+    같은 리 단위이므로 제외
   */
 
-  const totalEntries =
-    readUInt16LE(
-      bytes,
-      eocdOffset + 10
-    );
+  if (
+    /\s/.test(text)
+  ) {
+    return false;
+  }
 
   /*
-    EOCD + 16:
-    Central Directory 시작 위치
+    한글 법정동명,
+    숫자가 들어간 동,
+    '가' 지역까지 허용
+
+    예:
+    반포동
+    팔달로1가
+    충장로5가
   */
 
-  let offset =
-    readUInt32LE(
-      bytes,
-      eocdOffset + 16
-    );
+  return /^[가-힣0-9·]+$/.test(
+    text
+  );
+}
 
-  const utf8Decoder =
-    new TextDecoder(
-      "utf-8"
-    );
+/* =========================================
+   시도별 Markdown 파싱
+========================================= */
+
+function parseRegionMarkdown(
+  region: string,
+  markdown: string
+): LegalDong[] {
+  const result:
+    LegalDong[] = [];
+
+  const lines =
+    markdown
+      .replace(/\r/g, "")
+      .split("\n");
+
+  let currentDistrict =
+    "";
 
   for (
     let i = 0;
-    i < totalEntries;
+    i < lines.length;
     i++
   ) {
-    /*
-      Central Directory signature
-
-      50 4B 01 02
-    */
-
-    if (
-      bytes[offset] !== 0x50 ||
-      bytes[offset + 1] !== 0x4b ||
-      bytes[offset + 2] !== 0x01 ||
-      bytes[offset + 3] !== 0x02
-    ) {
-      break;
-    }
-
-    const compressionMethod =
-      readUInt16LE(
-        bytes,
-        offset + 10
-      );
-
-    const compressedSize =
-      readUInt32LE(
-        bytes,
-        offset + 20
-      );
-
-    const uncompressedSize =
-      readUInt32LE(
-        bytes,
-        offset + 24
-      );
-
-    const fileNameLength =
-      readUInt16LE(
-        bytes,
-        offset + 28
-      );
-
-    const extraLength =
-      readUInt16LE(
-        bytes,
-        offset + 30
-      );
-
-    const commentLength =
-      readUInt16LE(
-        bytes,
-        offset + 32
-      );
-
-    const localHeaderOffset =
-      readUInt32LE(
-        bytes,
-        offset + 42
-      );
-
-    const fileNameBytes =
-      bytes.slice(
-        offset + 46,
-        offset +
-          46 +
-          fileNameLength
+    const line =
+      clean(
+        lines[i]
       );
 
     /*
-      한글 파일명은 깨질 수 있지만
-      .txt 확장자는 정상적으로 읽힘
+      ## 천안시
+      ## 천안시 동남구
+      ## 천안시 서북구
+      ## 종로구
     */
 
-    const fileName =
-      utf8Decoder.decode(
-        fileNameBytes
-      );
-
     if (
-      fileName
-        .toLowerCase()
-        .endsWith(
-          ".txt"
-        )
+      line.startsWith(
+        "## "
+      )
     ) {
-      return {
-        compressionMethod,
-        compressedSize,
-        uncompressedSize,
-        localHeaderOffset,
-      };
+      const heading =
+        line
+          .replace(
+            /^##\s+/,
+            ""
+          )
+          .trim();
+
+      currentDistrict =
+        getMainDistrict(
+          heading
+        );
+
+      continue;
     }
 
-    offset +=
-      46 +
-      fileNameLength +
-      extraLength +
-      commentLength;
-  }
+    if (
+      !currentDistrict
+    ) {
+      continue;
+    }
 
-  throw new Error(
-    "법정동 전체자료 ZIP에서 TXT 파일을 찾지 못했습니다."
-  );
-}
+    if (
+      !line ||
+      line.startsWith("#") ||
+      line.startsWith("---") ||
+      line.startsWith("sido:") ||
+      line.startsWith("generated:") ||
+      line.startsWith("source:") ||
+      line.startsWith("sigungu_count:") ||
+      line.startsWith("legal_dong_count:")
+    ) {
+      continue;
+    }
 
-/* =========================================
-   ZIP Entry 압축 해제
-========================================= */
+    if (
+      line.includes(
+        "하위 법정동 없음"
+      )
+    ) {
+      continue;
+    }
 
-async function extractZipEntry(
-  zipBytes: Uint8Array,
-  entry: ZipEntry
-): Promise<Uint8Array> {
-  const offset =
-    entry.localHeaderOffset;
+    /*
+      한 줄:
 
-  /*
-    Local file header signature
+      불당동 · 성정동 · 두정동 · ...
+    */
 
-    50 4B 03 04
-  */
-
-  if (
-    zipBytes[offset] !== 0x50 ||
-    zipBytes[offset + 1] !== 0x4b ||
-    zipBytes[offset + 2] !== 0x03 ||
-    zipBytes[offset + 3] !== 0x04
-  ) {
-    throw new Error(
-      "법정동 ZIP 내부 파일 헤더가 올바르지 않습니다."
-    );
-  }
-
-  const fileNameLength =
-    readUInt16LE(
-      zipBytes,
-      offset + 26
-    );
-
-  const extraLength =
-    readUInt16LE(
-      zipBytes,
-      offset + 28
-    );
-
-  const dataStart =
-    offset +
-    30 +
-    fileNameLength +
-    extraLength;
-
-  const compressedData =
-    zipBytes.slice(
-      dataStart,
-      dataStart +
-        entry.compressedSize
-    );
-
-  /*
-    compressionMethod 0
-    = 압축 없음
-  */
-
-  if (
-    entry.compressionMethod ===
-    0
-  ) {
-    return compressedData;
-  }
-
-  /*
-    compressionMethod 8
-    = Deflate
-  */
-
-  if (
-    entry.compressionMethod !==
-    8
-  ) {
-    throw new Error(
-      `지원하지 않는 ZIP 압축 방식입니다: ${entry.compressionMethod}`
-    );
-  }
-
-  /*
-    Node / Vercel Web API의
-    DecompressionStream 사용
-  */
-
-  const stream =
-    new Blob([
-      compressedData,
-    ])
-      .stream()
-      .pipeThrough(
-        new DecompressionStream(
-          "deflate-raw"
+    const items =
+      line
+        .split("·")
+        .map(
+          (item) =>
+            clean(item)
         )
-      );
+        .filter(Boolean);
 
-  const buffer =
-    await new Response(
-      stream
-    ).arrayBuffer();
+    for (
+      const item of
+      items
+    ) {
+      if (
+        !isNeighborhoodItem(
+          item
+        )
+      ) {
+        continue;
+      }
 
-  const result =
-    new Uint8Array(
-      buffer
-    );
+      result.push({
+        region,
 
-  /*
-    파일 크기 간단 검증
-  */
+        district:
+          currentDistrict,
 
-  if (
-    entry.uncompressedSize >
-      0 &&
-    result.length === 0
-  ) {
-    throw new Error(
-      "법정동 TXT 압축 해제에 실패했습니다."
-    );
+        neighborhood:
+          item,
+
+        fullName:
+          `${region} ${currentDistrict} ${item}`,
+      });
+    }
   }
 
   return result;
 }
 
 /* =========================================
-   공식 ZIP 다운로드
+   시도 파일 하나 다운로드
 ========================================= */
 
-async function downloadOfficialZip(): Promise<Uint8Array> {
-  /*
-    공식 전체자료 다운로드는
-    POST 방식 사용
+async function loadRegion(
+  region: string
+): Promise<LegalDong[]> {
+  const url =
+    `${DATA_BASE_URL}/${encodeURIComponent(
+      region
+    )}.md`;
 
-    codeseId = 법정동코드
-  */
-
-  const body =
-    new URLSearchParams();
-
-  body.set(
-    "codeseId",
-    "법정동코드"
-  );
-
-  const response =
-    await fetch(
-      LEGAL_DONG_DOWNLOAD_URL,
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type":
-            "application/x-www-form-urlencoded;charset=UTF-8",
-
-          "User-Agent":
-            "jipsurimoa/1.0",
-        },
-
-        body:
-          body.toString(),
-
-        /*
-          Next.js 서버 캐시
-
-          하루마다 최신 자료 확인
-        */
-
-        next: {
-          revalidate:
-            86400,
-        },
-      }
-    );
-
-  if (
-    !response.ok
-  ) {
-    throw new Error(
-      `법정동 전체자료 다운로드 실패: ${response.status}`
-    );
-  }
-
-  const buffer =
-    await response.arrayBuffer();
-
-  const bytes =
-    toBytes(
-      buffer
-    );
-
-  /*
-    ZIP signature 검사
-
-    PK
-  */
-
-  if (
-    bytes.length < 4 ||
-    bytes[0] !== 0x50 ||
-    bytes[1] !== 0x4b
-  ) {
-    throw new Error(
-      "행정표준코드 서버에서 ZIP 파일이 아닌 응답을 받았습니다."
-    );
-  }
-
-  return bytes;
-}
-
-/* =========================================
-   EUC-KR TXT 읽기
-========================================= */
-
-function decodeLegalDongText(
-  bytes: Uint8Array
-): string {
   try {
-    /*
-      공식 TXT 파일은
-      EUC-KR 계열 인코딩
-    */
-
-    return new TextDecoder(
-      "euc-kr"
-    ).decode(
-      bytes
-    );
-  } catch {
-    /*
-      혹시 환경에서 EUC-KR Decoder가
-      실패할 경우 UTF-8 fallback
-    */
-
-    return new TextDecoder(
-      "utf-8"
-    ).decode(
-      bytes
-    );
-  }
-}
-
-/* =========================================
-   법정동 주소 → 집수리모아 데이터 변환
-========================================= */
-
-function parseLegalDongLine(
-  line: string
-): LegalDong | null {
-  const trimmed =
-    line.trim();
-
-  if (
-    !trimmed
-  ) {
-    return null;
-  }
-
-  const columns =
-    trimmed
-      .split("\t")
-      .map(
-        (value) =>
-          value.trim()
-      );
-
-  if (
-    columns.length <
-    2
-  ) {
-    return null;
-  }
-
-  const code =
-    columns[0];
-
-  const fullName =
-    columns[1];
-
-  const status =
-    columns[2] ?? "";
-
-  /*
-    헤더 제거
-  */
-
-  if (
-    code ===
-      "법정동코드" ||
-    fullName ===
-      "법정동명"
-  ) {
-    return null;
-  }
-
-  /*
-    코드 10자리만 인정
-  */
-
-  if (
-    !/^\d{10}$/.test(
-      code
-    )
-  ) {
-    return null;
-  }
-
-  /*
-    폐지 지역 제외
-
-    전체자료의 일반적인 값:
-    존재 / 폐지
-  */
-
-  if (
-    status &&
-    status !== "존재"
-  ) {
-    return null;
-  }
-
-  const parts =
-    fullName
-      .split(/\s+/)
-      .filter(Boolean);
-
-  if (
-    parts.length <
-    2
-  ) {
-    /*
-      서울특별시처럼
-      시·도 자체 행은 제외
-    */
-
-    return null;
-  }
-
-  const region =
-    parts[0];
-
-  const neighborhood =
-    parts[
-      parts.length - 1
-    ];
-
-  /*
-    리 단위 제외
-
-    읍 / 면 / 동만 사용
-  */
-
-  if (
-    !/(읍|면|동)$/.test(
-      neighborhood
-    )
-  ) {
-    return null;
-  }
-
-  /*
-    세종특별자치시는
-    시군구 단계가 없는 경우가 있음
-  */
-
-  let district = "";
-
-  if (
-    region ===
-    "세종특별자치시"
-  ) {
-    district = "";
-  } else {
-    /*
-      서울특별시 종로구 청운동
-      → 종로구
-
-      경기도 수원시 팔달구 인계동
-      → 수원시
-
-      충청남도 천안시 서북구 불당동
-      → 천안시
-
-      전라남도 해남군 해남읍
-      → 해남군
-    */
-
-    district =
-      parts[1] ?? "";
-  }
-
-  return {
-    code,
-    region,
-    district,
-    neighborhood,
-    fullName,
-  };
-}
-
-/* =========================================
-   TXT → LegalDong[]
-========================================= */
-
-function parseLegalDongText(
-  text: string
-): LegalDong[] {
-  const result =
-    new Map<
-      string,
-      LegalDong
-    >();
-
-  const lines =
-    text.split(
-      /\r?\n/
-    );
-
-  for (
-    const line of
-    lines
-  ) {
-    const item =
-      parseLegalDongLine(
-        line
+    const response =
+      await fetch(
+        url,
+        {
+          next: {
+            revalidate:
+              86400,
+          },
+        }
       );
 
     if (
-      !item
+      !response.ok
     ) {
-      continue;
+      console.error(
+        `법정동 데이터 조회 실패: ${region}`,
+        response.status
+      );
+
+      return [];
     }
 
-    /*
-      같은 지역 중복 제거
+    const text =
+      await response.text();
 
-      key에는 전체주소 사용
-    */
-
-    result.set(
-      item.fullName,
-      item
+    return parseRegionMarkdown(
+      region,
+      text
     );
-  }
+  } catch (
+    error
+  ) {
+    console.error(
+      `법정동 데이터 오류: ${region}`,
+      error
+    );
 
-  return [
-    ...result.values(),
-  ].sort(
-    (a, b) =>
-      a.fullName.localeCompare(
-        b.fullName,
-        "ko"
-      )
-  );
+    return [];
+  }
 }
 
 /* =========================================
-   전국 법정동 불러오기
-
-   다른 파일에서는 이것만 사용하면 됨.
-
-   const legalDongs =
-     await loadLegalDongs();
+   전국 데이터 로드
 ========================================= */
 
 export async function loadLegalDongs(): Promise<
   LegalDong[]
 > {
   /*
-    메모리 캐시 확인
+    메모리 캐시
   */
 
   if (
     memoryCache &&
     Date.now() -
       memoryCache.createdAt <
-      MEMORY_CACHE_TIME
+      CACHE_TIME
   ) {
     return memoryCache.data;
   }
 
   /*
-    1.
-    공식 전체자료 ZIP 다운로드
+    전국 시도 동시에 로드
   */
 
-  const zipBytes =
-    await downloadOfficialZip();
-
-  /*
-    2.
-    ZIP 안 TXT 찾기
-  */
-
-  const txtEntry =
-    findTxtEntry(
-      zipBytes
+  const results =
+    await Promise.all(
+      REGION_FILES.map(
+        (region) =>
+          loadRegion(
+            region
+          )
+      )
     );
 
   /*
-    3.
-    TXT 압축 해제
+    중복 제거
+
+    일반구가 있는 도시:
+
+    천안시 동남구
+    천안시 서북구
+
+    둘 다 district는 천안시로 합쳐지지만
+    법정동 이름이 같을 수 있으므로
+    중복 제거
   */
 
-  const txtBytes =
-    await extractZipEntry(
-      zipBytes,
-      txtEntry
-    );
+  const unique =
+    new Map<
+      string,
+      LegalDong
+    >();
 
-  /*
-    4.
-    EUC-KR → 문자열
-  */
+  for (
+    const regionData of
+    results
+  ) {
+    for (
+      const item of
+      regionData
+    ) {
+      const key =
+        [
+          item.region,
+          item.district,
+          item.neighborhood,
+        ].join("|");
 
-  const text =
-    decodeLegalDongText(
-      txtBytes
-    );
-
-  /*
-    5.
-    현존하는 읍면동만 추출
-  */
+      if (
+        !unique.has(
+          key
+        )
+      ) {
+        unique.set(
+          key,
+          item
+        );
+      }
+    }
+  }
 
   const data =
-    parseLegalDongText(
-      text
+    [
+      ...unique.values(),
+    ].sort(
+      (a, b) => {
+        const regionCompare =
+          a.region.localeCompare(
+            b.region,
+            "ko"
+          );
+
+        if (
+          regionCompare !==
+          0
+        ) {
+          return regionCompare;
+        }
+
+        const districtCompare =
+          a.district.localeCompare(
+            b.district,
+            "ko"
+          );
+
+        if (
+          districtCompare !==
+          0
+        ) {
+          return districtCompare;
+        }
+
+        return a.neighborhood.localeCompare(
+          b.neighborhood,
+          "ko"
+        );
+      }
     );
 
   if (
@@ -885,13 +541,9 @@ export async function loadLegalDongs(): Promise<
     0
   ) {
     throw new Error(
-      "법정동 데이터를 불러왔지만 읍·면·동을 찾지 못했습니다."
+      "전국 법정동 데이터를 불러오지 못했습니다."
     );
   }
-
-  /*
-    메모리 캐시 저장
-  */
 
   memoryCache = {
     createdAt:
@@ -904,19 +556,33 @@ export async function loadLegalDongs(): Promise<
 }
 
 /* =========================================
-   특정 시·군·구의 읍면동 조회
+   특정 시군구의 전체 법정동 조회
 
    예:
 
-   await getLegalNeighborhoods(
+   getLegalNeighborhoods(
      "충청남도",
      "천안시"
-   );
+   )
 
-   →
+   결과 예:
+
+   구성동
+   구룡동
+   다가동
+   대흥동
+   두정동
+   백석동
    불당동
+   성거읍
+   성남면
    성정동
+   성환읍
+   신부동
    쌍용동
+   입장면
+   직산읍
+   청수동
    ...
 ========================================= */
 
@@ -927,7 +593,7 @@ export async function getLegalNeighborhoods(
   const data =
     await loadLegalDongs();
 
-  const neighborhoods =
+  const result =
     new Set<string>();
 
   for (
@@ -948,13 +614,13 @@ export async function getLegalNeighborhoods(
       continue;
     }
 
-    neighborhoods.add(
+    result.add(
       item.neighborhood
     );
   }
 
   return [
-    ...neighborhoods,
+    ...result,
   ].sort(
     (a, b) =>
       a.localeCompare(
@@ -965,9 +631,9 @@ export async function getLegalNeighborhoods(
 }
 
 /* =========================================
-   특정 시·도의 읍면동 조회
+   시도 전체 읍면동/법정동
 
-   세종 같은 지역에서 사용 가능
+   세종용
 ========================================= */
 
 export async function getRegionNeighborhoods(
@@ -976,7 +642,7 @@ export async function getRegionNeighborhoods(
   const data =
     await loadLegalDongs();
 
-  const neighborhoods =
+  const result =
     new Set<string>();
 
   for (
@@ -990,13 +656,13 @@ export async function getRegionNeighborhoods(
       continue;
     }
 
-    neighborhoods.add(
+    result.add(
       item.neighborhood
     );
   }
 
   return [
-    ...neighborhoods,
+    ...result,
   ].sort(
     (a, b) =>
       a.localeCompare(
